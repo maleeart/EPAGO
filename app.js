@@ -130,16 +130,30 @@ function initDatabase() {
 // Session Check
 function checkSession() {
     const userSession = localStorage.getItem(DB_CURRENT_USER_KEY);
+    const homeBtn = document.getElementById("nav-home-btn");
+    const logoutBtn = document.getElementById("nav-logout-btn");
+    
     if (userSession) {
         currentUser = JSON.parse(userSession);
         document.getElementById("user-display-name").innerText = `คุณ${currentUser.name}`;
         
-        // Ensure nav actions show home button
-        document.getElementById("nav-home-btn").classList.remove("hidden");
+        if (homeBtn) homeBtn.classList.remove("hidden");
+        if (logoutBtn) logoutBtn.classList.remove("hidden");
         switchView("lobby");
     } else {
-        document.getElementById("nav-home-btn").classList.add("hidden");
+        if (homeBtn) homeBtn.classList.add("hidden");
+        if (logoutBtn) logoutBtn.classList.add("hidden");
         switchView("register");
+    }
+}
+
+// User Logout
+function logoutUser() {
+    if (confirm("คุณต้องการออกจากระบบผู้ใช้เพื่อกลับไปหน้าลงทะเบียนใช่หรือไม่?")) {
+        localStorage.removeItem(DB_CURRENT_USER_KEY);
+        currentUser = null;
+        checkSession();
+        showToast("ออกจากระบบผู้ใช้งานเรียบร้อยแล้ว");
     }
 }
 
