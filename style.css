@@ -1292,3 +1292,15 @@ body.admin-mode .hero-banner {
 .view-section.active {
     display: block;
 }
+
+/* Segmented Control for Login/Registration Mode Toggle */
+.seg-btn.active {
+    background-color: var(--blue) !important;
+    color: white !important;
+    box-shadow: 0 4px 6px -1px rgba(27,76,158,0.2), 0 2px 4px -1px rgba(27,76,158,0.1);
+}
+
+.seg-btn:not(.active):hover {
+    color: var(--blue) !important;
+    background-color: rgba(27,76,158,0.05);
+}

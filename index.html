@@ -82,9 +82,20 @@
                         <i data-lucide="user-check"></i>
                     </div>
                     <h2>ลงทะเบียนเข้าชมสื่อเรียนรู้</h2>
-                    <p class="subtitle">กรอกข้อมูลส่วนตัวเพื่อเข้ารับชมคลิปวิดีโอการอนุรักษ์พลังงานภายในองค์กร</p>
+                    <p class="subtitle" style="margin-bottom: 1rem;">กรอกข้อมูลลงทะเบียนใหม่ หรือเลือกชื่อที่เคยลงทะเบียนเพื่อเข้าใช้งานได้ทันที</p>
                 </div>
                 
+                <!-- Segmented Control tab buttons -->
+                <div class="segmented-control" style="display: flex; background: #eef3fa; padding: 4px; border-radius: 0.5rem; margin-bottom: 1.5rem; border: 1px solid rgba(27,76,158,0.1);">
+                    <button type="button" id="tab-reg-new-btn" class="seg-btn active" onclick="switchRegisterMode('new')" style="flex: 1; padding: 0.5rem; font-size: 0.9rem; font-weight: 600; border: none; background: transparent; cursor: pointer; border-radius: 0.35rem; color: var(--text-secondary); transition: all 0.2s;">
+                        <i data-lucide="user-plus" style="width: 14px; height: 14px; display: inline-block; vertical-align: middle; margin-right: 4px;"></i> ลงทะเบียนใหม่
+                    </button>
+                    <button type="button" id="tab-reg-returning-btn" class="seg-btn" onclick="switchRegisterMode('returning')" style="flex: 1; padding: 0.5rem; font-size: 0.9rem; font-weight: 600; border: none; background: transparent; cursor: pointer; border-radius: 0.35rem; color: var(--text-secondary); transition: all 0.2s;">
+                        <i data-lucide="user-check" style="width: 14px; height: 14px; display: inline-block; vertical-align: middle; margin-right: 4px;"></i> ผู้เคยลงทะเบียนแล้ว
+                    </button>
+                </div>
+                
+                <!-- Tab 1: New User Registration Form -->
                 <form id="register-form" onsubmit="handleRegistration(event)">
                     <div class="form-group">
                         <label><i data-lucide="user-cog"></i> ประเภทบุคลากร <span style="color:var(--red)">*</span></label>
@@ -120,6 +131,20 @@
                     
                     <button type="submit" class="btn btn-primary btn-block" style="margin-top: 1.5rem;">
                         ลงทะเบียนและเข้าชม <i data-lucide="arrow-right"></i>
+                    </button>
+                </form>
+
+                <!-- Tab 2: Returning User Login Form (Hidden by default) -->
+                <form id="returning-user-form" class="hidden" onsubmit="handleReturningLogin(event)">
+                    <div class="form-group" style="margin-bottom: 1.25rem;">
+                        <label for="returning-user-select" style="margin-bottom: 0.5rem; font-weight: 700; color: var(--blue-d);"><i data-lucide="users" style="color: var(--blue);"></i> เลือกรายชื่อของคุณเพื่อเข้าสู่ระบบ <span style="color:var(--red)">*</span></label>
+                        <select id="returning-user-select" required style="width: 100%; padding: 0.75rem; border-radius: 0.5rem; border: 1px solid var(--border); font-family: inherit; font-size: 0.95rem; background-color: white; color: var(--text-primary);">
+                            <!-- Loaded dynamically by JS -->
+                        </select>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary btn-block" style="margin-top: 1.5rem;">
+                        เข้าสู่ระบบผู้ใช้งาน <i data-lucide="log-in"></i>
                     </button>
                 </form>
             </div>

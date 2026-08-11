@@ -81,6 +81,7 @@ document.addEventListener("DOMContentLoaded", () => {
     initDatabase();
     checkSession();
     renderUserLobby();
+    populateReturningUsers();
     
     // Render units radio buttons
     const unitsWrapper = document.getElementById("units-wrapper");
@@ -314,6 +315,77 @@ function handleRegistration(e) {
     if (empidGroup && empidInput) {
         empidGroup.classList.remove("hidden");
         empidInput.required = true;
+    }
+    
+    // Update returning users list
+    populateReturningUsers();
+}
+
+// Populate Returning User dropdown
+function populateReturningUsers() {
+    const select = document.getElementById("returning-user-select");
+    if (!select) return;
+    
+    select.innerHTML = '<option value="" disabled selected>-- เลือกรายชื่อผู้เคยลงทะเบียน --</option>';
+    if (participants.length === 0) {
+        select.innerHTML += '<option value="" disabled>ไม่มีรายชื่อผู้ลงทะเบียนก่อนหน้า</option>';
+        return;
+    }
+    
+    // Sort participants by name for easy search
+    const sorted = [...participants].sort((a, b) => a.name.localeCompare(b.name, 'th'));
+    sorted.forEach(p => {
+        const detail = p.empId ? `รหัส: ${p.empId}` : p.dept;
+        const opt = document.createElement("option");
+        opt.value = p.empId ? p.empId : p.name;
+        opt.innerText = `${p.name} (${p.emptype} - ${detail})`;
+        select.appendChild(opt);
+    });
+}
+
+// Switch between New Registration and Returning User Login Mode
+function switchRegisterMode(mode) {
+    const regForm = document.getElementById("register-form");
+    const returningForm = document.getElementById("returning-user-form");
+    const regNewBtn = document.getElementById("tab-reg-new-btn");
+    const regReturningBtn = document.getElementById("tab-reg-returning-btn");
+    
+    if (mode === 'new') {
+        regForm.classList.remove("hidden");
+        returningForm.classList.add("hidden");
+        regNewBtn.classList.add("active");
+        regReturningBtn.classList.remove("active");
+    } else {
+        regForm.classList.add("hidden");
+        returningForm.classList.remove("hidden");
+        regNewBtn.classList.remove("active");
+        regReturningBtn.classList.add("active");
+        populateReturningUsers();
+    }
+}
+
+// Handle Returning User quick login
+function handleReturningLogin(e) {
+    e.preventDefault();
+    const select = document.getElementById("returning-user-select");
+    const userKey = select.value;
+    if (!userKey) {
+        showToast("กรุณาเลือกรายชื่อของคุณ", true);
+        return;
+    }
+    
+    // Find user by empId or name
+    const user = participants.find(p => (p.empId && p.empId === userKey) || (!p.empId && p.name === userKey));
+    if (user) {
+        currentUser = user;
+        localStorage.setItem(DB_CURRENT_USER_KEY, JSON.stringify(currentUser));
+        showToast(`ยินดีต้อนรับกลับมาครับ คุณ${user.name} 🌱`);
+        checkSession();
+        
+        // Reset returning form
+        document.getElementById("returning-user-form").reset();
+    } else {
+        showToast("ไม่พบข้อมูลผู้ใช้งาน", true);
     }
 }
 
@@ -714,8 +786,12 @@ function renderAdminParticipantsTable() {
     const statSelect = document.getElementById("admin-stat-unit-select");
     const selectedUnit = statSelect ? statSelect.value : "ทั้งหมด";
     
-    // Filter participants based on selected unit
-    const filteredParticipants = participants.filter(p => selectedUnit === "ทั้งหมด" || p.dept === selectedUnit);
+    // Filter participants based on selected unit (robust matching for custom inputs under "อื่นๆ")
+    const filteredParticipants = participants.filter(p => {
+        if (selectedUnit === "ทั้งหมด") return true;
+        if (selectedUnit === "อื่นๆ") return p.dept === "อื่นๆ" || (p.dept && p.dept.startsWith("อื่นๆ:"));
+        return p.dept === selectedUnit;
+    });
     
     if (filteredParticipants.length === 0) {
         tbody.innerHTML = `
@@ -780,8 +856,12 @@ function renderAffiliationVideoStats() {
     
     tbody.innerHTML = "";
     
-    // Filter participants in this affiliation
-    const filteredUsers = participants.filter(p => selectedUnit === "ทั้งหมด" || p.dept === selectedUnit);
+    // Filter participants in this affiliation (robust matching for custom inputs under "อื่นๆ")
+    const filteredUsers = participants.filter(p => {
+        if (selectedUnit === "ทั้งหมด") return true;
+        if (selectedUnit === "อื่นๆ") return p.dept === "อื่นๆ" || (p.dept && p.dept.startsWith("อื่นๆ:"));
+        return p.dept === selectedUnit;
+    });
     
     if (videos.length === 0) {
         tbody.innerHTML = `
@@ -905,6 +985,7 @@ function clearAllParticipants() {
         watchedLogs = {};
         localStorage.setItem(DB_USERS_KEY, JSON.stringify(participants));
         localStorage.setItem(DB_WATCHED_KEY, JSON.stringify(watchedLogs));
+        populateReturningUsers();
         showToast("ล้างประวัติผู้เข้าร่วมกิจกรรมทั้งหมดแล้ว");
         renderAdminDashboard();
     }
