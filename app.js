@@ -191,8 +191,13 @@ async function checkOnlineStatus() {
         return;
     }
     try {
-        const res = await fetch("/api/login", { method: "HEAD" }).catch(() => null);
-        isOnlineDb = res !== null && res.status !== 404;
+        const res = await fetch("/api/db-status").catch(() => null);
+        if (res && res.ok) {
+            const data = await res.json();
+            isOnlineDb = !!data.online;
+        } else {
+            isOnlineDb = false;
+        }
         console.log("EPAGO: Database connection status: " + (isOnlineDb ? "ONLINE (Vercel Cloud)" : "OFFLINE (LocalStorage Fallback)"));
         
         if (isOnlineDb) {
@@ -201,6 +206,11 @@ async function checkOnlineStatus() {
             if (currentUser) {
                 syncCurrentUserWatchedProgress();
             }
+        } else {
+            // Load fallbacks immediately if database is offline or not connected
+            videos = JSON.parse(localStorage.getItem(DB_VIDEOS_KEY)) || DEFAULT_VIDEOS;
+            participants = JSON.parse(localStorage.getItem(DB_USERS_KEY)) || DEFAULT_PARTICIPANTS;
+            watchedLogs = JSON.parse(localStorage.getItem(DB_WATCHED_KEY)) || DEFAULT_WATCHED_LOGS;
         }
     } catch (e) {
         isOnlineDb = false;

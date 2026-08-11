@@ -34,12 +34,42 @@ export async function saveParticipant(data) {
   });
 }
 
+const DEFAULT_PARTICIPANTS = [
+  {
+    emptype: "พนักงาน",
+    empId: "EMP001",
+    name: "นายสมชาย รักษ์พลังงาน",
+    dept: "ฝ่ายเทคโนโลยีสารสนเทศ",
+    regTime: "2026-08-11 08:30",
+    watched: ["vid-1"]
+  },
+  {
+    emptype: "ลูกจ้าง",
+    empId: "",
+    name: "นางสาวสมหญิง ประหยัดดี",
+    dept: "ฝ่ายการเงินและบัญชี",
+    regTime: "2026-08-11 09:15",
+    watched: ["vid-1"]
+  }
+];
+
 export async function readAllParticipants() {
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
     return [];
   }
   
-  const { blobs } = await list({ prefix: PREFIX });
+  let { blobs } = await list({ prefix: PREFIX });
+  
+  // Seed default participants on Vercel Blob if the database is empty
+  if (!blobs || blobs.length === 0) {
+    console.log("EPAGO: Cloud participants empty. Seeding defaults...");
+    for (const p of DEFAULT_PARTICIPANTS) {
+      await saveParticipant(p).catch(e => console.error("Failed to seed participant:", e));
+    }
+    const result = await list({ prefix: PREFIX });
+    blobs = result.blobs;
+  }
+  
   if (!blobs || blobs.length === 0) return [];
   
   const rows = await Promise.all(blobs.map(async b => {
