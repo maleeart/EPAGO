@@ -173,6 +173,15 @@
                     <button type="submit" class="btn btn-primary btn-block" style="margin-top: 1.5rem;">
                         เข้าสู่ระบบผู้ใช้งาน <i data-lucide="log-in"></i>
                     </button>
+                    
+                    <div id="login-suggestions-container" class="hidden" style="margin-top: 1.25rem; padding: 1rem; border-radius: 0.5rem; background-color: rgba(27, 76, 158, 0.05); border: 1px dashed rgba(27, 76, 158, 0.25);">
+                        <p style="font-size: 0.85rem; font-weight: 600; color: var(--blue); margin-bottom: 0.50rem; display: flex; align-items: center; gap: 0.25rem;">
+                            <i data-lucide="help-circle" style="width: 14px; height: 14px;"></i> คุณหมายถึงผู้ใช้งานเหล่านี้ใช่หรือไม่?
+                        </p>
+                        <div id="login-suggestions-list" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                            <!-- Suggestion buttons will be loaded here -->
+                        </div>
+                    </div>
                 </form>
             </div>
         </section>

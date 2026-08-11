@@ -15,6 +15,27 @@ const normalizeName = name => {
         .replace(/\s+/g, "");
 };
 
+// Calculate Levenshtein Distance between two strings to find similar names (typos)
+const getLevenshteinDistance = (a, b) => {
+    const matrix = [];
+    for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+    for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+    for (let i = 1; i <= b.length; i++) {
+        for (let j = 1; j <= a.length; j++) {
+            if (b.charAt(i - 1) === a.charAt(j - 1)) {
+                matrix[i][j] = matrix[i - 1][j - 1];
+            } else {
+                matrix[i][j] = Math.min(
+                    matrix[i - 1][j - 1] + 1, // substitution
+                    matrix[i][j - 1] + 1,     // insertion
+                    matrix[i - 1][j] + 1      // deletion
+                );
+            }
+        }
+    }
+    return matrix[b.length][a.length];
+};
+
 // Default Video Seed Data
 const DEFAULT_VIDEOS = [
     {
@@ -521,6 +542,10 @@ function switchRegisterMode(mode) {
     const regNewBtn = document.getElementById("tab-reg-new-btn");
     const regReturningBtn = document.getElementById("tab-reg-returning-btn");
     
+    // Hide suggestions when switching modes
+    const suggestionsContainer = document.getElementById("login-suggestions-container");
+    if (suggestionsContainer) suggestionsContainer.classList.add("hidden");
+    
     if (mode === 'new') {
         regForm.classList.remove("hidden");
         returningForm.classList.add("hidden");
@@ -564,6 +589,10 @@ function localReturningLoginFallback(emptype, name, empId, normalizedInputName) 
         showToast(`ยินดีต้อนรับกลับมาครับ คุณ${user.name} 🌱`);
         checkSession();
         
+        // Hide suggestions panel on success
+        const suggestionsContainer = document.getElementById("login-suggestions-container");
+        if (suggestionsContainer) suggestionsContainer.classList.add("hidden");
+        
         document.getElementById("returning-user-form").reset();
         const retEmpidGroup = document.getElementById("ret-empid-group");
         const retEmpidInput = document.getElementById("ret-empid");
@@ -572,7 +601,8 @@ function localReturningLoginFallback(emptype, name, empId, normalizedInputName) 
             retEmpidInput.required = true;
         }
     } else {
-        showToast("ไม่พบข้อมูลลงทะเบียนในระบบ กรุณาตรวจสอบหรือลงทะเบียนใหม่", true);
+        showToast("ไม่พบข้อมูลลงทะเบียนในระบบ กรุณาตรวจสอบหรือดูคำแนะนำด้านล่าง", true);
+        showLoginSuggestions(name, emptype);
     }
 }
 
@@ -641,6 +671,10 @@ async function handleReturningLogin(e) {
                 
                 showToast(`ยินดีต้อนรับกลับมาครับ คุณ${currentUser.name} 🌱`);
                 checkSession();
+                
+                // Hide suggestions panel on success
+                const suggestionsContainer = document.getElementById("login-suggestions-container");
+                if (suggestionsContainer) suggestionsContainer.classList.add("hidden");
                 
                 document.getElementById("returning-user-form").reset();
                 const retEmpidGroup = document.getElementById("ret-empid-group");
@@ -1703,4 +1737,87 @@ function localEditFallback(oldUserKey, newUserKey, keyChanged, updatedUser) {
     showToast("แก้ไขข้อมูลสำเร็จ (โหมดออฟไลน์) 🌱");
     closeParticipantEditModal();
     refreshAdminDashboard();
+}
+
+// --- Similar Names Suggestions for Login Typos ---
+function showLoginSuggestions(inputName, selectedEmptype) {
+    const suggestionsContainer = document.getElementById("login-suggestions-container");
+    const suggestionsList = document.getElementById("login-suggestions-list");
+    if (!suggestionsContainer || !suggestionsList) return;
+    
+    const normalizedInput = normalizeName(inputName);
+    if (!normalizedInput || normalizedInput.length < 2) {
+        suggestionsContainer.classList.add("hidden");
+        return;
+    }
+    
+    const matches = [];
+    participants.forEach(p => {
+        const normalizedDb = normalizeName(p.name);
+        let score = 999;
+        
+        const contains = normalizedDb.includes(normalizedInput) || normalizedInput.includes(normalizedDb);
+        const dist = getLevenshteinDistance(normalizedDb, normalizedInput);
+        
+        if (contains) {
+            score = dist - 5; // Substring contain matches rank higher
+        } else if (dist <= 3) {
+            score = dist;
+        }
+        
+        if (contains || dist <= 3) {
+            matches.push({
+                user: p,
+                score: score
+            });
+        }
+    });
+    
+    matches.sort((a, b) => a.score - b.score);
+    const topMatches = matches.slice(0, 3);
+    
+    if (topMatches.length > 0) {
+        suggestionsList.innerHTML = "";
+        topMatches.forEach(match => {
+            const u = match.user;
+            const detailText = u.emptype === "พนักงาน" 
+                ? `คุณ${u.name} - สังกัด ${u.dept} (รหัสพนักงาน: ${u.empId})`
+                : `คุณ${u.name} - สังกัด ${u.dept} (ประเภท: ลูกจ้าง)`;
+                
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "btn btn-outline btn-block";
+            btn.style.textAlign = "left";
+            btn.style.fontSize = "0.85rem";
+            btn.style.padding = "0.6rem 0.8rem";
+            btn.style.marginTop = "0.25rem";
+            btn.style.borderColor = "rgba(27, 76, 158, 0.2)";
+            btn.style.color = "var(--text-primary)";
+            btn.innerHTML = `<i data-lucide="user-check" style="width: 14px; height: 14px; color: var(--blue); margin-right: 4px; vertical-align: middle; display: inline-block;"></i> ${detailText}`;
+            
+            btn.onclick = () => {
+                if (confirm(`ยืนยันการเข้าสู่ระบบในชื่อ "${u.name}" ใช่หรือไม่?`)) {
+                    currentUser = u;
+                    localStorage.setItem(DB_CURRENT_USER_KEY, JSON.stringify(currentUser));
+                    
+                    const userKey = currentUser.empId || currentUser.name;
+                    watchedLogs[userKey] = currentUser.watched || [];
+                    localStorage.setItem(DB_WATCHED_KEY, JSON.stringify(watchedLogs));
+                    
+                    showToast(`เข้าสู่ระบบสำเร็จ ยินดีต้อนรับกลับมา คุณ${u.name} 🌱`);
+                    
+                    document.getElementById("returning-user-form").reset();
+                    suggestionsContainer.classList.add("hidden");
+                    
+                    checkSession();
+                }
+            };
+            suggestionsList.appendChild(btn);
+        });
+        
+        lucide.createIcons();
+        suggestionsContainer.classList.remove("hidden");
+    } else {
+        suggestionsContainer.classList.add("hidden");
+    }
 }
