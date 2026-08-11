@@ -7,6 +7,14 @@ const DB_USERS_KEY = "energysave_participants";
 const DB_CURRENT_USER_KEY = "energysave_current_user";
 const DB_WATCHED_KEY = "energysave_watched_logs"; // Keyed by empId: [videoIds]
 
+// Name normalization helper to ignore Thai prefix titles (นาย, นาง, นางสาว, ดร., etc.) and spacing
+const normalizeName = name => {
+    if (!name) return "";
+    return name.trim()
+        .replace(/^(นาย|นางสาว|นาง|ด\.ช\.|ด\.ญ\.|นายแพทย์|แพทย์หญิง|ดร\.)\s*/, "")
+        .replace(/\s+/g, "");
+};
+
 // Default Video Seed Data
 const DEFAULT_VIDEOS = [
     {
@@ -140,6 +148,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
 // Seed data storage if empty
 function initDatabase() {
+    // Database Versioning / Force Reset for default videos
+    const DB_VERSION = "v1.2";
+    if (localStorage.getItem("db_version") !== DB_VERSION) {
+        localStorage.setItem(DB_VIDEOS_KEY, JSON.stringify(DEFAULT_VIDEOS));
+        localStorage.setItem("db_version", DB_VERSION);
+    }
+
     // Videos Init
     if (!localStorage.getItem(DB_VIDEOS_KEY)) {
         localStorage.setItem(DB_VIDEOS_KEY, JSON.stringify(DEFAULT_VIDEOS));
@@ -285,9 +300,10 @@ function handleRegistration(e) {
         regTime: formattedDate
     };
     
-    // Check if participant already exists in logs
+    // Check if participant already exists in logs (using normalized name for contractors)
+    const normalizedRegName = normalizeName(name);
     const existingIndex = participants.findIndex(p => 
-        (empId && p.empId === empId) || (!empId && p.name === name && p.emptype === "ลูกจ้าง")
+        (empId && p.empId === empId) || (!empId && normalizeName(p.name) === normalizedRegName && p.emptype === "ลูกจ้าง")
     );
     
     if (existingIndex === -1) {
@@ -385,10 +401,13 @@ function handleReturningLogin(e) {
         }
     }
     
-    // Find user in local database matching exactly (ignores double spaces)
+    // Normalize input name for comparison
+    const normalizedInputName = normalizeName(name);
+
+    // Find user in local database matching exactly (ignores Thai prefixes and double spaces)
     const user = participants.find(p => 
         p.emptype === emptype &&
-        p.name.replace(/\s+/g, '') === name.replace(/\s+/g, '') &&
+        normalizeName(p.name) === normalizedInputName &&
         (emptype === "ลูกจ้าง" || (p.empId && p.empId === empId))
     );
     
