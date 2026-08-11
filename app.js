@@ -710,11 +710,18 @@ function renderAdminParticipantsTable() {
     const tbody = document.getElementById("admin-users-table-body");
     tbody.innerHTML = "";
     
-    if (participants.length === 0) {
+    // Read selected unit filter from dropdown if present
+    const statSelect = document.getElementById("admin-stat-unit-select");
+    const selectedUnit = statSelect ? statSelect.value : "ทั้งหมด";
+    
+    // Filter participants based on selected unit
+    const filteredParticipants = participants.filter(p => selectedUnit === "ทั้งหมด" || p.dept === selectedUnit);
+    
+    if (filteredParticipants.length === 0) {
         tbody.innerHTML = `
             <tr>
                 <td colspan="6" class="text-center" style="padding: 2rem; color: var(--text-secondary);">
-                    ยังไม่มีข้อมูลผู้ลงทะเบียนเข้าร่วมกิจกรรม
+                    ไม่มีข้อมูลผู้ลงทะเบียนสำหรับสังกัดนี้
                 </td>
             </tr>
         `;
@@ -722,13 +729,28 @@ function renderAdminParticipantsTable() {
     }
     
     // Sort by registration time descending (newest first)
-    const sortedParticipants = [...participants].sort((a,b) => b.regTime.localeCompare(a.regTime));
+    const sortedParticipants = [...filteredParticipants].sort((a,b) => b.regTime.localeCompare(a.regTime));
     
     sortedParticipants.forEach(user => {
         const userKey = user.empId || user.name;
         const userWatched = watchedLogs[userKey] || [];
         const totalCount = videos.length;
         const watchedCount = userWatched.filter(id => videos.some(v => v.id === id)).length;
+        
+        // Find unwatched videos
+        const unwatched = videos.filter(v => !userWatched.includes(v.id));
+        let unwatchedHtml = "";
+        if (unwatched.length > 0 && totalCount > 0) {
+            // Renders list of missing videos with category tag and red cross icon
+            unwatchedHtml = `<div style="font-size: 0.78rem; color: var(--red); margin-top: 6px; font-weight: 500; text-align: left; line-height: 1.35;">
+                <span style="font-weight: 700;">ขาดเรื่อง:</span><br>
+                ${unwatched.map(v => `<span style="opacity: 0.85;">❌ ${v.title}</span>`).join("<br>")}
+            </div>`;
+        } else if (totalCount > 0) {
+            unwatchedHtml = `<div style="font-size: 0.78rem; color: var(--success); margin-top: 6px; font-weight: 700; text-align: left;">
+                ✔️ ชมครบถ้วนทุกคลิปแล้ว
+            </div>`;
+        }
         
         const tr = document.createElement("tr");
         tr.innerHTML = `
@@ -742,6 +764,7 @@ function renderAdminParticipantsTable() {
                     <i data-lucide="${watchedCount === totalCount && totalCount > 0 ? 'trophy' : 'eye'}"></i>
                     <span>ชมแล้ว ${watchedCount}/${totalCount} คลิป</span>
                 </span>
+                ${unwatchedHtml}
             </td>
         `;
         tbody.appendChild(tr);
@@ -792,6 +815,9 @@ function renderAffiliationVideoStats() {
         `;
         tbody.appendChild(tr);
     });
+
+    // Synchronize the bottom participants list table with this affiliation filter
+    renderAdminParticipantsTable();
 }
 
 // --- CRUD: Add / Edit Videos ---
