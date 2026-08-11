@@ -276,11 +276,17 @@ function handleRegistration(e) {
         regTime: formattedDate
     };
     
-    // Check if participant already exists in logs (using normalized name for contractors)
+    // Check if participant already exists in logs (using normalized name for contractors, robust for older schemas)
     const normalizedRegName = normalizeName(name);
-    const existingIndex = participants.findIndex(p => 
-        (empId && p.empId === empId) || (!empId && normalizeName(p.name) === normalizedRegName && p.emptype === "ลูกจ้าง")
-    );
+    const existingIndex = participants.findIndex(p => {
+        if (empId) {
+            return p.empId && p.empId.toUpperCase() === empId.toUpperCase();
+        } else {
+            const dbHasNoId = !p.empId || p.empId === "";
+            const typeMatches = !p.emptype || p.emptype === "ลูกจ้าง";
+            return dbHasNoId && typeMatches && normalizeName(p.name) === normalizedRegName;
+        }
+    });
     
     if (existingIndex === -1) {
         // Add new participant
@@ -381,11 +387,22 @@ function handleReturningLogin(e) {
     const normalizedInputName = normalizeName(name);
 
     // Find user in local database matching exactly (ignores Thai prefixes and double spaces)
-    const user = participants.find(p => 
-        p.emptype === emptype &&
-        normalizeName(p.name) === normalizedInputName &&
-        (emptype === "ลูกจ้าง" || (p.empId && p.empId === empId))
-    );
+    // Robust backward-compatible check for cases where p.emptype is undefined/missing from older versions
+    const user = participants.find(p => {
+        // Name check (normalized)
+        const nameMatches = normalizeName(p.name) === normalizedInputName;
+        if (!nameMatches) return false;
+        
+        // ID check if employee
+        if (emptype === "พนักงาน") {
+            return p.empId && p.empId.toUpperCase() === empId.toUpperCase();
+        } else {
+            // For contractor (no empId): match if database record has no ID, and type matches (or type is missing)
+            const dbHasNoId = !p.empId || p.empId === "";
+            const typeMatches = !p.emptype || p.emptype === "ลูกจ้าง";
+            return dbHasNoId && typeMatches;
+        }
+    });
     
     if (user) {
         currentUser = user;
