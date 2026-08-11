@@ -1,0 +1,776 @@
+// EnergySave Video Portal - Application Logic
+
+// --- Constants & Config ---
+const ADMIN_PASSWORD = "8888";
+const DB_VIDEOS_KEY = "energysave_videos";
+const DB_USERS_KEY = "energysave_participants";
+const DB_CURRENT_USER_KEY = "energysave_current_user";
+const DB_WATCHED_KEY = "energysave_watched_logs"; // Keyed by empId: [videoIds]
+
+// Default Video Seed Data
+const DEFAULT_VIDEOS = [
+    {
+        id: "vid-1",
+        category: "ไฟฟ้า",
+        title: "เทคนิคประหยัดไฟในออฟฟิศ 🔌",
+        description: "เรียนรู้วิธีตั้งค่าการประหยัดพลังงานคอมพิวเตอร์ การปิดหน้าจอช่วงพักเที่ยง และการจัดการระบบสแตนด์บายของเครื่องใช้ไฟฟ้าอย่างถูกวิธี",
+        url: "", // Leave blank for simulation
+        duration: "3:45"
+    },
+    {
+        id: "vid-2",
+        category: "ไฟฟ้า",
+        title: "ปรับอุณหภูมิแอร์ เพิ่มประสิทธิภาพการประหยัดแอร์ 🌱",
+        description: "การปรับอุณหภูมิเครื่องปรับอากาศเป็น 26 องศาเซลเซียส พร้อมเปิดพัดลมควบคู่ ช่วยลดภาระการทำงานของแอร์และประหยัดค่าไฟลงได้มากกว่า 10%",
+        url: "https://www.youtube.com/watch?v=kYJUp5WwFik", // Sample Youtube Video (clean energy / energy saving themed)
+        duration: "5:20"
+    },
+    {
+        id: "vid-3",
+        category: "น้ำ",
+        title: "หยดน้ำเล็กๆ ที่หายไป: รณรงค์การประหยัดน้ำในองค์กร 💧",
+        description: "ชี้ให้เห็นถึงความสูญเสียจากอุปกรณ์ห้องน้ำที่ชำรุด วิธีแจ้งซ่อมอย่างรวดเร็ว และการใช้น้ำอย่างคุ้มค่าในจุดล้างจานและห้องน้ำส่วนกลาง",
+        url: "",
+        duration: "2:15"
+    },
+    {
+        id: "vid-4",
+        category: "กระดาษ/ขยะ",
+        title: "ก้าวสู่ Paperless Office ด้วยกระดาษ 2 หน้า 📄",
+        description: "แนวทางการทำงานแบบดิจิทัลเพื่อลดปริมาณการพิมพ์เอกสาร และการคัดแยกเศษกระดาษเพื่อนำมารีไซเคิลอย่างสร้างสรรค์เพื่อลดการทำลายทรัพยากรป่าไม้",
+        url: "",
+        duration: "4:05"
+    }
+];
+
+// Default Participants Seed Data for Demo
+const DEFAULT_PARTICIPANTS = [
+    {
+        empId: "EMP001",
+        name: "นายสมชาย รักษ์พลังงาน",
+        dept: "ฝ่ายเทคโนโลยีสารสนเทศ",
+        phone: "0812345678",
+        regTime: "2026-08-11 08:30"
+    },
+    {
+        empId: "EMP002",
+        name: "นางสาวสมหญิง ประหยัดดี",
+        dept: "ฝ่ายการเงินและบัญชี",
+        phone: "0898765432",
+        regTime: "2026-08-11 09:15"
+    }
+];
+
+const DEFAULT_WATCHED_LOGS = {
+    "EMP001": ["vid-1", "vid-3"],
+    "EMP002": ["vid-1", "vid-2", "vid-3", "vid-4"]
+};
+
+// --- App State ---
+let videos = [];
+let participants = [];
+let watchedLogs = {};
+let currentUser = null;
+let currentPlayingVideo = null;
+let playSimInterval = null;
+
+// --- Initialize App ---
+document.addEventListener("DOMContentLoaded", () => {
+    initDatabase();
+    checkSession();
+    renderUserLobby();
+    
+    // Admin login overlay backdrop click close
+    document.getElementById("admin-login-modal").addEventListener("click", (e) => {
+        if (e.target.id === "admin-login-modal") closeAdminLogin();
+    });
+});
+
+// Seed data storage if empty
+function initDatabase() {
+    // Videos Init
+    if (!localStorage.getItem(DB_VIDEOS_KEY)) {
+        localStorage.setItem(DB_VIDEOS_KEY, JSON.stringify(DEFAULT_VIDEOS));
+    }
+    videos = JSON.parse(localStorage.getItem(DB_VIDEOS_KEY));
+
+    // Participants Init
+    if (!localStorage.getItem(DB_USERS_KEY)) {
+        localStorage.setItem(DB_USERS_KEY, JSON.stringify(DEFAULT_PARTICIPANTS));
+    }
+    participants = JSON.parse(localStorage.getItem(DB_USERS_KEY));
+
+    // Watched Logs Init
+    if (!localStorage.getItem(DB_WATCHED_KEY)) {
+        localStorage.setItem(DB_WATCHED_KEY, JSON.stringify(DEFAULT_WATCHED_LOGS));
+    }
+    watchedLogs = JSON.parse(localStorage.getItem(DB_WATCHED_KEY));
+}
+
+// Session Check
+function checkSession() {
+    const userSession = localStorage.getItem(DB_CURRENT_USER_KEY);
+    if (userSession) {
+        currentUser = JSON.parse(userSession);
+        document.getElementById("user-display-name").innerText = `คุณ${currentUser.name}`;
+        
+        // Ensure nav actions show home button
+        document.getElementById("nav-home-btn").classList.remove("hidden");
+        switchView("lobby");
+    } else {
+        document.getElementById("nav-home-btn").classList.add("hidden");
+        switchView("register");
+    }
+}
+
+// --- View Router ---
+function switchView(viewName) {
+    // Hide all views
+    document.querySelectorAll(".view-section").forEach(sec => sec.classList.remove("active"));
+    
+    // Show selected view
+    if (viewName === "register") {
+        document.getElementById("register-view").classList.add("active");
+    } else if (viewName === "lobby") {
+        document.getElementById("lobby-view").classList.add("active");
+        renderUserLobby();
+    } else if (viewName === "admin") {
+        document.getElementById("admin-view").classList.add("active");
+        renderAdminDashboard();
+    }
+    
+    // Scroll to top
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// --- Toast Notification System ---
+function showToast(message, isError = false) {
+    const toast = document.getElementById("toast");
+    const toastMsg = document.getElementById("toast-message");
+    const toastIcon = document.getElementById("toast-icon");
+    
+    toastMsg.innerText = message;
+    
+    if (isError) {
+        toast.classList.add("toast-error");
+        toastIcon.setAttribute("data-lucide", "alert-circle");
+    } else {
+        toast.classList.remove("toast-error");
+        toastIcon.setAttribute("data-lucide", "check-circle");
+    }
+    
+    lucide.createIcons();
+    toast.classList.remove("hidden");
+    
+    // Auto hide after 3 seconds
+    setTimeout(() => {
+        toast.classList.add("hidden");
+    }, 3000);
+}
+
+// --- User Registration ---
+function handleRegistration(e) {
+    e.preventDefault();
+    
+    const name = document.getElementById("reg-name").value.trim();
+    const dept = document.getElementById("reg-dept").value.trim();
+    const empId = document.getElementById("reg-empid").value.trim().toUpperCase();
+    const phone = document.getElementById("reg-phone").value.trim();
+    
+    if (!name || !dept || !empId || !phone) {
+        showToast("กรุณากรอกข้อมูลให้ครบถ้วนทุกช่อง", true);
+        return;
+    }
+    
+    // Format current date and time
+    const now = new Date();
+    const formattedDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    
+    const newParticipant = {
+        empId,
+        name,
+        dept,
+        phone,
+        regTime: formattedDate
+    };
+    
+    // Check if participant already exists in logs
+    const existingIndex = participants.findIndex(p => p.empId === empId);
+    if (existingIndex === -1) {
+        // Add new participant
+        participants.push(newParticipant);
+        localStorage.setItem(DB_USERS_KEY, JSON.stringify(participants));
+    } else {
+        // Update existing participant details
+        participants[existingIndex] = newParticipant;
+        localStorage.setItem(DB_USERS_KEY, JSON.stringify(participants));
+    }
+    
+    // Initialize empty watched logs for this user if not exist
+    if (!watchedLogs[empId]) {
+        watchedLogs[empId] = [];
+        localStorage.setItem(DB_WATCHED_KEY, JSON.stringify(watchedLogs));
+    }
+    
+    // Set Current Session
+    currentUser = newParticipant;
+    localStorage.setItem(DB_CURRENT_USER_KEY, JSON.stringify(currentUser));
+    
+    document.getElementById("user-display-name").innerText = `คุณ${name}`;
+    document.getElementById("nav-home-btn").classList.remove("hidden");
+    
+    showToast("ลงทะเบียนและเข้าชมสื่อได้สำเร็จ 🌱");
+    switchView("lobby");
+    
+    // Reset register form
+    document.getElementById("register-form").reset();
+}
+
+// --- User Video Lobby rendering ---
+function renderUserLobby() {
+    if (!currentUser) return;
+    
+    const userWatched = watchedLogs[currentUser.empId] || [];
+    const totalVideos = videos.length;
+    const watchedCount = userWatched.filter(id => videos.some(v => v.id === id)).length;
+    
+    // Update Stats panel
+    document.getElementById("user-watched-count").innerText = watchedCount;
+    document.getElementById("user-progress-text").innerText = `${watchedCount}/${totalVideos} คลิป`;
+    
+    const progressPercent = totalVideos > 0 ? (watchedCount / totalVideos) * 100 : 0;
+    document.getElementById("user-progress-bar").style.width = `${progressPercent}%`;
+    
+    // Render grid
+    const grid = document.getElementById("video-grid");
+    grid.innerHTML = "";
+    
+    if (videos.length === 0) {
+        grid.innerHTML = `
+            <div class="glass-card text-center" style="grid-column: 1/-1; padding: 3rem;">
+                <i data-lucide="video-off" style="width: 3.5rem; height: 3.5rem; color: var(--text-secondary); margin-bottom: 1rem;"></i>
+                <h3>ขณะนี้ไม่มีคลิปวิดีโอให้บริการ</h3>
+                <p class="subtitle">กรุณารอแอดมินอัปโหลดไฟล์เข้าระบบเพื่อเริ่มต้นเรียนรู้</p>
+            </div>
+        `;
+        lucide.createIcons();
+        return;
+    }
+    
+    videos.forEach(video => {
+        const isWatched = userWatched.includes(video.id);
+        const card = document.createElement("div");
+        card.className = "glass-card video-card";
+        card.onclick = () => playVideo(video.id);
+        
+        card.innerHTML = `
+            <div class="video-thumbnail">
+                <span class="category-badge">${video.category}</span>
+                <span class="duration-tag"><i data-lucide="clock" style="width: 10px; height: 10px; display: inline; vertical-align: middle;"></i> ${video.duration}</span>
+                
+                <div class="thumbnail-placeholder">
+                    <i data-lucide="play-circle"></i>
+                    <span>รับชมคลิปวิดีโอ</span>
+                </div>
+                
+                <div class="play-overlay">
+                    <i data-lucide="play"></i>
+                </div>
+            </div>
+            <div class="video-card-content">
+                <h4 class="video-card-title">${video.title}</h4>
+                <p class="video-card-desc">${video.description}</p>
+                <div class="video-card-footer">
+                    <div class="watched-status-pill ${isWatched ? 'watched' : ''}">
+                        <i data-lucide="${isWatched ? 'check-circle' : 'circle'}"></i>
+                        <span>${isWatched ? 'รับชมแล้ว' : 'ยังไม่ได้ชม'}</span>
+                    </div>
+                    <span style="font-size: 0.8rem; color: var(--text-secondary);">คลิกเพื่อเข้าชม <i data-lucide="chevron-right" style="width: 12px; height: 12px; display: inline; vertical-align: middle;"></i></span>
+                </div>
+            </div>
+        `;
+        
+        grid.appendChild(card);
+    });
+    
+    lucide.createIcons();
+}
+
+// --- Video Player Functions ---
+function playVideo(videoId) {
+    const video = videos.find(v => v.id === videoId);
+    if (!video) return;
+    
+    currentPlayingVideo = video;
+    document.getElementById("player-title").innerText = video.title;
+    document.getElementById("player-desc").innerText = video.description;
+    
+    const embedContainer = document.getElementById("video-embed-container");
+    embedContainer.innerHTML = "";
+    
+    // Check if there is a real URL
+    if (video.url && (video.url.includes("youtube.com") || video.url.includes("youtu.be"))) {
+        // Parse YouTube URL
+        const ytId = getYoutubeId(video.url);
+        if (ytId) {
+            embedContainer.innerHTML = `
+                <iframe src="https://www.youtube.com/embed/${ytId}?autoplay=1&enablejsapi=1" 
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                        allowfullscreen></iframe>
+            `;
+        } else {
+            renderSimulatedPlayer(video);
+        }
+    } else if (video.url && video.url.endsWith(".mp4")) {
+        embedContainer.innerHTML = `
+            <video controls autoplay>
+                <source src="${video.url}" type="video/mp4">
+                เบราว์เซอร์ของคุณไม่สนับสนุนการเล่นวิดีโอ
+            </video>
+        `;
+    } else {
+        // Fallback: Custom premium simulated video player
+        renderSimulatedPlayer(video);
+    }
+    
+    // Show Modal
+    document.getElementById("video-player-modal").classList.remove("hidden");
+}
+
+function getYoutubeId(url) {
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+    const match = url.match(regExp);
+    return (match && match[2].length === 11) ? match[2] : null;
+}
+
+function renderSimulatedPlayer(video) {
+    const embedContainer = document.getElementById("video-embed-container");
+    
+    // Parse duration text (e.g. "3:45" or "03:45") to seconds
+    const durationParts = video.duration.split(":");
+    let totalSeconds = 120; // Default fallback 2 mins
+    if (durationParts.length === 2) {
+        totalSeconds = parseInt(durationParts[0], 10) * 60 + parseInt(durationParts[1], 10);
+    } else if (durationParts.length === 1) {
+        totalSeconds = parseInt(durationParts[0], 10);
+    }
+    
+    embedContainer.innerHTML = `
+        <div class="sim-player-placeholder">
+            <div id="sim-play-btn" class="sim-player-icon-glowing" onclick="toggleSimPlay(${totalSeconds})">
+                <i data-lucide="play" id="sim-play-btn-icon"></i>
+            </div>
+            <h4 id="sim-status-title" style="margin-bottom: 0.5rem; text-shadow: 0 0 10px rgba(255,255,255,0.1);">เครื่องเล่นจำลอง: ยังไม่ได้เริ่มเล่น</h4>
+            <p style="font-size: 0.85rem; max-width: 80%;">[ไม่มีลิงก์วิดีโอจริง] กรุณากดปุ่มเล่นเพื่อจำลองการรับชมจนจบ หรือกดยืนยันด้านล่าง</p>
+            
+            <div class="sim-progress-row">
+                <span class="sim-time" id="sim-time-current">0:00</span>
+                <div class="sim-timeline-bg" onclick="seekSimPlayer(event, ${totalSeconds})">
+                    <div id="sim-timeline-fill" class="sim-timeline-fill"></div>
+                </div>
+                <span class="sim-time" id="sim-time-total">${video.duration}</span>
+            </div>
+        </div>
+    `;
+    
+    lucide.createIcons();
+    
+    // State reset for sim player
+    window.simPlayState = {
+        isPlaying: false,
+        currentTime: 0,
+        totalTime: totalSeconds
+    };
+}
+
+function toggleSimPlay(totalSeconds) {
+    const playBtn = document.getElementById("sim-play-btn");
+    const playIcon = document.getElementById("sim-play-btn-icon");
+    const statusTitle = document.getElementById("sim-status-title");
+    
+    if (!window.simPlayState.isPlaying) {
+        // Start playing
+        window.simPlayState.isPlaying = true;
+        playBtn.classList.add("playing");
+        playIcon.setAttribute("data-lucide", "pause");
+        statusTitle.innerText = "กำลังรับชมสื่อความรู้...";
+        
+        // Sim ticking fast (10x speed so user doesn't wait forever, e.g. ticks 2.5 seconds every 250ms)
+        const tickRate = 250; // ms
+        const timeJump = Math.ceil(totalSeconds / 30); // finish video in approx 7.5 seconds
+        
+        playSimInterval = setInterval(() => {
+            window.simPlayState.currentTime += timeJump;
+            if (window.simPlayState.currentTime >= totalSeconds) {
+                window.simPlayState.currentTime = totalSeconds;
+                clearInterval(playSimInterval);
+                // Video finished
+                window.simPlayState.isPlaying = false;
+                playBtn.classList.remove("playing");
+                playIcon.setAttribute("data-lucide", "rotate-ccw");
+                statusTitle.innerHTML = "<span style='color: var(--primary);'>รับชมวิดีโอจำลองสำเร็จแล้ว! 🎉</span>";
+                showToast("จำลองการรับชมวิดีโอสำเร็จ");
+            }
+            
+            updateSimPlayerUI();
+        }, tickRate);
+    } else {
+        // Pause playing
+        window.simPlayState.isPlaying = false;
+        clearInterval(playSimInterval);
+        playBtn.classList.remove("playing");
+        playIcon.setAttribute("data-lucide", "play");
+        statusTitle.innerText = "หยุดเล่นชั่วคราว";
+    }
+    lucide.createIcons();
+}
+
+function seekSimPlayer(e, totalSeconds) {
+    if (playSimInterval) clearInterval(playSimInterval);
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const width = rect.width;
+    const pct = clickX / width;
+    
+    window.simPlayState.currentTime = Math.round(pct * totalSeconds);
+    window.simPlayState.isPlaying = false;
+    
+    const playBtn = document.getElementById("sim-play-btn");
+    const playIcon = document.getElementById("sim-play-btn-icon");
+    const statusTitle = document.getElementById("sim-status-title");
+    playBtn.classList.remove("playing");
+    playIcon.setAttribute("data-lucide", "play");
+    statusTitle.innerText = "ย้ายช่วงเวลาแล้ว - กดเพื่อเล่นต่อ";
+    
+    updateSimPlayerUI();
+    lucide.createIcons();
+}
+
+function updateSimPlayerUI() {
+    const current = window.simPlayState.currentTime;
+    const total = window.simPlayState.totalTime;
+    
+    // Update progress bar width
+    const pct = (current / total) * 100;
+    document.getElementById("sim-timeline-fill").style.width = `${pct}%`;
+    
+    // Update format time
+    document.getElementById("sim-time-current").innerText = formatSeconds(current);
+}
+
+function formatSeconds(secs) {
+    const minutes = Math.floor(secs / 60);
+    const seconds = secs % 60;
+    return `${minutes}:${String(seconds).padStart(2, '0')}`;
+}
+
+function closeVideoPlayer() {
+    // Stop intervals / videos
+    if (playSimInterval) clearInterval(playSimInterval);
+    document.getElementById("video-embed-container").innerHTML = "";
+    document.getElementById("video-player-modal").classList.add("hidden");
+    currentPlayingVideo = null;
+}
+
+function markCurrentVideoWatched() {
+    if (!currentUser || !currentPlayingVideo) return;
+    
+    const empId = currentUser.empId;
+    const videoId = currentPlayingVideo.id;
+    
+    if (!watchedLogs[empId]) {
+        watchedLogs[empId] = [];
+    }
+    
+    if (!watchedLogs[empId].includes(videoId)) {
+        watchedLogs[empId].push(videoId);
+        localStorage.setItem(DB_WATCHED_KEY, JSON.stringify(watchedLogs));
+        showToast("บันทึกการรับชมวิดีโอนี้เรียบร้อยแล้ว!");
+    } else {
+        showToast("คุณเคยบันทึกการรับชมวิดีโอนี้แล้ว");
+    }
+    
+    closeVideoPlayer();
+    renderUserLobby();
+}
+
+// --- Admin Authentication ---
+function openAdminLogin() {
+    document.getElementById("admin-login-modal").classList.remove("hidden");
+    document.getElementById("admin-pass").focus();
+}
+
+function closeAdminLogin() {
+    document.getElementById("admin-login-modal").classList.add("hidden");
+    document.getElementById("admin-pass").value = "";
+    document.getElementById("admin-login-error").classList.add("hidden");
+}
+
+function handleAdminLogin(e) {
+    e.preventDefault();
+    const pass = document.getElementById("admin-pass").value;
+    
+    if (pass === ADMIN_PASSWORD) {
+        closeAdminLogin();
+        showToast("เข้าสู่โหมดแอดมินสำเร็จ");
+        switchView("admin");
+    } else {
+        document.getElementById("admin-login-error").classList.remove("hidden");
+        document.getElementById("admin-pass").focus();
+    }
+}
+
+function logoutAdmin() {
+    showToast("ออกจากโหมดผู้ดูแลระบบแล้ว");
+    checkSession(); // Will return to registration or lobby depending on session
+}
+
+// --- Admin Dashboard logic ---
+function switchAdminTab(tabName) {
+    document.getElementById("tab-videos-btn").classList.remove("active");
+    document.getElementById("tab-users-btn").classList.remove("active");
+    document.getElementById("admin-tab-videos").classList.remove("active");
+    document.getElementById("admin-tab-users").classList.remove("active");
+    
+    if (tabName === 'videos') {
+        document.getElementById("tab-videos-btn").classList.add("active");
+        document.getElementById("admin-tab-videos").classList.add("active");
+    } else {
+        document.getElementById("tab-users-btn").classList.add("active");
+        document.getElementById("admin-tab-users").classList.add("active");
+    }
+}
+
+function renderAdminDashboard() {
+    // Calculate total stats
+    const totalParticipants = participants.length;
+    const totalVideos = videos.length;
+    
+    let totalViews = 0;
+    Object.values(watchedLogs).forEach(arr => {
+        // Only count views for videos that actually exist
+        const validViews = arr.filter(vId => videos.some(v => v.id === vId)).length;
+        totalViews += validViews;
+    });
+    
+    document.getElementById("admin-total-participants").innerText = totalParticipants;
+    document.getElementById("admin-total-videos").innerText = totalVideos;
+    document.getElementById("admin-total-views").innerText = totalViews;
+    
+    // Render Tabs content
+    renderAdminVideosTable();
+    renderAdminParticipantsTable();
+}
+
+function renderAdminVideosTable() {
+    const tbody = document.getElementById("admin-video-table-body");
+    tbody.innerHTML = "";
+    
+    if (videos.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="5" class="text-center" style="padding: 2rem; color: var(--text-secondary);">
+                    ไม่มีวิดีโอในคลังสื่อขณะนี้ กรุณาคลิกปุ่ม "เพิ่มวิดีโอใหม่"
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    videos.forEach((video) => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+            <td><span class="category-pill">${video.category}</span></td>
+            <td><strong style="color: var(--text-primary);">${video.title}</strong></td>
+            <td><span style="font-size: 0.85rem; color: var(--text-secondary); display: block; max-height: 40px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 320px;">${video.description}</span></td>
+            <td>
+                ${video.url ? `<a href="${video.url}" target="_blank" style="color: var(--primary); text-decoration: none; display: flex; align-items: center; gap: 0.2rem;"><i data-lucide="external-link" style="width: 12px; height: 12px;"></i> ดูลิงก์จริง</a>` : `<span style="color: var(--text-secondary); font-style: italic;">ระบบเล่นจำลอง</span>`}
+            </td>
+            <td style="text-align: center;">
+                <div class="button-group" style="justify-content: center;">
+                    <button class="btn btn-outline" style="padding: 0.35rem 0.6rem; font-size: 0.8rem; border-radius: 0.4rem;" onclick="openVideoModal('${video.id}')">
+                        <i data-lucide="edit" style="width: 12px; height: 12px;"></i> แก้ไข
+                    </button>
+                    <button class="btn btn-danger-outline" style="padding: 0.35rem 0.6rem; font-size: 0.8rem; border-radius: 0.4rem;" onclick="deleteVideo('${video.id}')">
+                        <i data-lucide="trash" style="width: 12px; height: 12px;"></i> ลบ
+                    </button>
+                </div>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+    
+    lucide.createIcons();
+}
+
+function renderAdminParticipantsTable() {
+    const tbody = document.getElementById("admin-users-table-body");
+    tbody.innerHTML = "";
+    
+    if (participants.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="6" class="text-center" style="padding: 2rem; color: var(--text-secondary);">
+                    ยังไม่มีข้อมูลผู้ลงทะเบียนเข้าร่วมกิจกรรม
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    // Sort by registration time descending (newest first)
+    const sortedParticipants = [...participants].sort((a,b) => b.regTime.localeCompare(a.regTime));
+    
+    sortedParticipants.forEach(user => {
+        const userWatched = watchedLogs[user.empId] || [];
+        const totalCount = videos.length;
+        const watchedCount = userWatched.filter(id => videos.some(v => v.id === id)).length;
+        
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+            <td style="font-family: 'Outfit', sans-serif; font-weight: 500;">${user.empId}</td>
+            <td><strong>${user.name}</strong></td>
+            <td>${user.dept}</td>
+            <td style="font-family: 'Outfit', sans-serif;">${user.phone}</td>
+            <td style="font-family: 'Outfit', sans-serif; font-size: 0.85rem; color: var(--text-secondary);">${user.regTime}</td>
+            <td>
+                <span class="watched-status-pill ${watchedCount === totalCount && totalCount > 0 ? 'watched' : ''}">
+                    <i data-lucide="${watchedCount === totalCount && totalCount > 0 ? 'trophy' : 'eye'}"></i>
+                    <span>ชมแล้ว ${watchedCount}/${totalCount} คลิป</span>
+                </span>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+    
+    lucide.createIcons();
+}
+
+// --- CRUD: Add / Edit Videos ---
+function openVideoModal(videoId = "") {
+    const modal = document.getElementById("video-edit-modal");
+    const form = document.getElementById("video-form");
+    const modalTitle = document.getElementById("video-modal-title");
+    
+    form.reset();
+    
+    if (videoId) {
+        // Edit Mode
+        const video = videos.find(v => v.id === videoId);
+        if (!video) return;
+        
+        modalTitle.innerText = "แก้ไขข้อมูลคลิปวิดีโอ";
+        document.getElementById("video-id").value = video.id;
+        document.getElementById("video-category").value = video.category;
+        document.getElementById("video-title").value = video.title;
+        document.getElementById("video-description").value = video.description;
+        document.getElementById("video-url").value = video.url;
+        document.getElementById("video-duration").value = video.duration;
+    } else {
+        // Add Mode
+        modalTitle.innerText = "เพิ่มวิดีโอการเรียนรู้ใหม่";
+        document.getElementById("video-id").value = "";
+    }
+    
+    modal.classList.remove("hidden");
+}
+
+function closeVideoModal() {
+    document.getElementById("video-edit-modal").classList.add("hidden");
+    document.getElementById("video-form").reset();
+}
+
+function handleVideoSave(e) {
+    e.preventDefault();
+    
+    const id = document.getElementById("video-id").value;
+    const category = document.getElementById("video-category").value;
+    const title = document.getElementById("video-title").value.trim();
+    const description = document.getElementById("video-description").value.trim();
+    const url = document.getElementById("video-url").value.trim();
+    const duration = document.getElementById("video-duration").value.trim();
+    
+    if (!title || !description || !duration) {
+        showToast("กรุณากรอกข้อมูลวิดีโอที่จำเป็นให้ครบถ้วน", true);
+        return;
+    }
+    
+    if (id) {
+        // Update Video
+        const index = videos.findIndex(v => v.id === id);
+        if (index !== -1) {
+            videos[index] = { id, category, title, description, url, duration };
+            showToast("แก้ไขข้อมูลคลิปวิดีโอสำเร็จแล้ว");
+        }
+    } else {
+        // Create Video
+        const newId = `vid-${Date.now()}`;
+        const newVideo = { id: newId, category, title, description, url, duration };
+        videos.push(newVideo);
+        showToast("เพิ่มคลิปวิดีโอการเรียนรู้เข้าระบบสำเร็จ");
+    }
+    
+    localStorage.setItem(DB_VIDEOS_KEY, JSON.stringify(videos));
+    closeVideoModal();
+    renderAdminDashboard();
+}
+
+function deleteVideo(videoId) {
+    if (confirm("คุณแน่ใจหรือไม่ว่าต้องการลบคลิปวิดีโอนี้? การดำเนินการนี้ไม่สามารถย้อนกลับได้")) {
+        videos = videos.filter(v => v.id !== videoId);
+        localStorage.setItem(DB_VIDEOS_KEY, JSON.stringify(videos));
+        showToast("ลบคลิปวิดีโอเรียบร้อยแล้ว");
+        renderAdminDashboard();
+    }
+}
+
+// --- Clear Participant Logs ---
+function clearAllParticipants() {
+    if (confirm("⚠️ คำเตือน! คุณแน่ใจที่จะลบประวัติการลงทะเบียนทั้งหมดใช่หรือไม่? ข้อมูลนี้จะหายไปอย่างถาวร")) {
+        participants = [];
+        watchedLogs = {};
+        localStorage.setItem(DB_USERS_KEY, JSON.stringify(participants));
+        localStorage.setItem(DB_WATCHED_KEY, JSON.stringify(watchedLogs));
+        showToast("ล้างประวัติผู้เข้าร่วมกิจกรรมทั้งหมดแล้ว");
+        renderAdminDashboard();
+    }
+}
+
+// --- Export Participants Data to CSV ---
+function exportParticipantsToCSV() {
+    if (participants.length === 0) {
+        showToast("ไม่มีข้อมูลผู้ลงทะเบียนสำหรับส่งออก", true);
+        return;
+    }
+    
+    // Header Row in Thai
+    let csvContent = "รหัสพนักงาน,ชื่อ-นามสกุล,แผนก/ฝ่าย,เบอร์โทรศัพท์,วันเวลาลงทะเบียน,จำนวนวิดีโอที่ดูเสร็จสิ้น,สถานะการชมคลังสื่อทั้งหมด\n";
+    
+    participants.forEach(user => {
+        const userWatched = watchedLogs[user.empId] || [];
+        const totalCount = videos.length;
+        const watchedCount = userWatched.filter(id => videos.some(v => v.id === id)).length;
+        const statusText = (watchedCount === totalCount && totalCount > 0) ? "รับชมครบถ้วน" : "กำลังรับชม";
+        
+        // Escape commas and double quotes for clean CSV
+        const safeName = `"${user.name.replace(/"/g, '""')}"`;
+        const safeDept = `"${user.dept.replace(/"/g, '""')}"`;
+        
+        csvContent += `${user.empId},${safeName},${safeDept},'${user.phone},${user.regTime},${watchedCount}/${totalCount},${statusText}\n`;
+    });
+    
+    // Add UTF-8 BOM byte sequence (EF BB BF) so Microsoft Excel opens it with proper Thai characters encoding
+    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `EnergySave_Participants_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.style.visibility = 'hidden';
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    showToast("ดาวน์โหลดไฟล์ CSV เรียบร้อยแล้ว 📊");
+}

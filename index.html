@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EnergySave Video Portal - ปลูกจิตสำนึกรักษ์พลังงาน</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌱</text></svg>">
+    <!-- Google Fonts: Outfit (English) & Noto Sans Thai (Thai) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Lucide Icons for premium feel -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Background Decor Elements -->
+    <div class="decor-glow glow-1"></div>
+    <div class="decor-glow glow-2"></div>
+
+    <!-- Main Navigation / Header -->
+    <header class="app-header">
+        <div class="header-container">
+            <div class="logo">
+                <i data-lucide="leaf" class="icon-logo"></i>
+                <span class="logo-text">Energy<span class="logo-accent">Save</span></span>
+            </div>
+            <nav class="nav-actions">
+                <button id="nav-home-btn" class="nav-btn active hidden" onclick="switchView('lobby')">
+                    <i data-lucide="home"></i> หน้าแรก
+                </button>
+                <button id="admin-entry-btn" class="nav-btn" onclick="openAdminLogin()">
+                    <i data-lucide="shield-alert"></i> โหมดแอดมิน
+                </button>
+            </nav>
+        </div>
+    </header>
+
+    <main class="main-container">
+        <!-- VIEW 1: REGISTRATION -->
+        <section id="register-view" class="view-section active">
+            <div class="glass-card register-card">
+                <div class="card-header text-center">
+                    <div class="badge-icon">
+                        <i data-lucide="user-check"></i>
+                    </div>
+                    <h2>ลงทะเบียนเข้าชมสื่อเรียนรู้</h2>
+                    <p class="subtitle">กรอกข้อมูลส่วนตัวเพื่อเข้ารับชมคลิปวิดีโอการอนุรักษ์พลังงานภายในองค์กร</p>
+                </div>
+                
+                <form id="register-form" onsubmit="handleRegistration(event)">
+                    <div class="form-group">
+                        <label for="reg-name"><i data-lucide="user"></i> ชื่อ-นามสกุล</label>
+                        <input type="text" id="reg-name" required placeholder="เช่น นายประหยัด รักษ์โลก">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="reg-dept"><i data-lucide="git-branch"></i> แผนก/ฝ่าย</label>
+                        <input type="text" id="reg-dept" required placeholder="เช่น ฝ่ายทรัพยากรบุคคล, ฝ่ายผลิต">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="reg-empid"><i data-lucide="hash"></i> รหัสพนักงาน</label>
+                        <input type="text" id="reg-empid" required placeholder="เช่น EMP1024">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="reg-phone"><i data-lucide="phone"></i> เบอร์โทรศัพท์</label>
+                        <input type="tel" id="reg-phone" required pattern="[0-9]{9,10}" placeholder="เช่น 0891234567">
+                        <small class="form-help">กรอกเฉพาะตัวเลข 9-10 หลัก</small>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary btn-block">
+                        ลงทะเบียนและเข้าชม <i data-lucide="arrow-right"></i>
+                    </button>
+                </form>
+            </div>
+        </section>
+
+        <!-- VIEW 2: VIDEO LOBBY -->
+        <section id="lobby-view" class="view-section">
+            <!-- User Status Panel -->
+            <div class="user-welcome-panel glass-card">
+                <div class="welcome-text">
+                    <h3>ยินดีต้อนรับ, <span id="user-display-name" class="highlight-text">คุณผู้ใช้งาน</span> 🌱</h3>
+                    <p>ร่วมเป็นส่วนหนึ่งในการประหยัดพลังงานเพื่อองค์กรและโลกของเรา</p>
+                </div>
+                <div class="welcome-stats">
+                    <div class="stat-item">
+                        <span class="stat-num" id="user-watched-count">0</span>
+                        <span class="stat-label">ดูแล้ว (คลิป)</span>
+                    </div>
+                    <div class="stat-progress">
+                        <div class="progress-bar-bg">
+                            <div id="user-progress-bar" class="progress-bar-fill" style="width: 0%;"></div>
+                        </div>
+                        <span class="progress-text" id="user-progress-text">0/0 คลิป</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Video Section Header -->
+            <div class="section-title-wrapper">
+                <div>
+                    <h2 class="section-title">คลังสื่อการเรียนรู้อนุรักษ์พลังงาน</h2>
+                    <p class="section-subtitle">คลิกที่วิดีโอเพื่อรับชมและเรียนรู้วิธีประหยัดพลังงานในชีวิตประจำวัน</p>
+                </div>
+            </div>
+
+            <!-- Video Grid -->
+            <div id="video-grid" class="video-grid">
+                <!-- Loaded dynamically by JS -->
+            </div>
+        </section>
+
+        <!-- VIEW 3: ADMIN DASHBOARD -->
+        <section id="admin-view" class="view-section">
+            <div class="admin-header-row">
+                <div>
+                    <h2><i data-lucide="settings"></i> ผู้ดูแลระบบ (Admin Dashboard)</h2>
+                    <p class="subtitle">จัดการคลิปวิดีโอและตรวจสอบข้อมูลผู้ลงทะเบียนเข้าชม</p>
+                </div>
+                <div class="admin-actions">
+                    <button class="btn btn-danger" onclick="logoutAdmin()">
+                        <i data-lucide="log-out"></i> ออกจากระบบ
+                    </button>
+                </div>
+            </div>
+
+            <!-- Admin Stat Cards -->
+            <div class="admin-stats-grid">
+                <div class="stat-card glass-card">
+                    <div class="stat-icon bg-emerald">
+                        <i data-lucide="users"></i>
+                    </div>
+                    <div class="stat-details">
+                        <h4 id="admin-total-participants">0</h4>
+                        <p>ผู้ลงทะเบียนทั้งหมด</p>
+                    </div>
+                </div>
+                <div class="stat-card glass-card">
+                    <div class="stat-icon bg-blue">
+                        <i data-lucide="video"></i>
+                    </div>
+                    <div class="stat-details">
+                        <h4 id="admin-total-videos">0</h4>
+                        <p>วิดีโอที่ให้บริการ</p>
+                    </div>
+                </div>
+                <div class="stat-card glass-card">
+                    <div class="stat-icon bg-purple">
+                        <i data-lucide="eye"></i>
+                    </div>
+                    <div class="stat-details">
+                        <h4 id="admin-total-views">0</h4>
+                        <p>สถิติการรับชมรวม</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Admin Tabs Navigation -->
+            <div class="admin-tabs">
+                <button id="tab-videos-btn" class="tab-btn active" onclick="switchAdminTab('videos')">
+                    <i data-lucide="film"></i> จัดการคลิปวิดีโอ
+                </button>
+                <button id="tab-users-btn" class="tab-btn" onclick="switchAdminTab('users')">
+                    <i data-lucide="clipboard-list"></i> ข้อมูลผู้เข้าชม
+                </button>
+            </div>
+
+            <!-- TAB 1: MANAGE VIDEOS -->
+            <div id="admin-tab-videos" class="admin-tab-content active">
+                <div class="tab-action-header">
+                    <h3>รายการวิดีโอทั้งหมด</h3>
+                    <button class="btn btn-emerald" onclick="openVideoModal()">
+                        <i data-lucide="plus"></i> เพิ่มวิดีโอใหม่
+                    </button>
+                </div>
+                
+                <div class="table-responsive">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 15%;">หมวดหมู่</th>
+                                <th style="width: 25%;">ชื่อคลิปวิดีโอ</th>
+                                <th style="width: 35%;">รายละเอียด / คำอธิบาย</th>
+                                <th style="width: 10%;">ความยาว</th>
+                                <th style="width: 15%; text-align: center;">จัดการ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-video-table-body">
+                            <!-- Dynamic Content -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- TAB 2: PARTICIPANTS LOG -->
+            <div id="admin-tab-users" class="admin-tab-content">
+                <div class="tab-action-header">
+                    <h3>ประวัติการลงทะเบียนและเข้าร่วม</h3>
+                    <div class="button-group">
+                        <button class="btn btn-outline" onclick="exportParticipantsToCSV()">
+                            <i data-lucide="download"></i> ส่งออกไฟล์ CSV
+                        </button>
+                        <button class="btn btn-danger-outline" onclick="clearAllParticipants()">
+                            <i data-lucide="trash-2"></i> ล้างข้อมูลทั้งหมด
+                        </button>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>รหัสพนักงาน</th>
+                                <th>ชื่อ-นามสกุล</th>
+                                <th>แผนก/ฝ่าย</th>
+                                <th>เบอร์โทรศัพท์</th>
+                                <th>เวลาลงทะเบียน</th>
+                                <th>จำนวนวิดีโอที่ชม</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-users-table-body">
+                            <!-- Dynamic Content -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- ADMIN LOGIN MODAL -->
+    <div id="admin-login-modal" class="modal-overlay hidden">
+        <div class="glass-card modal-card">
+            <button class="modal-close" onclick="closeAdminLogin()">
+                <i data-lucide="x"></i>
+            </button>
+            <div class="card-header text-center">
+                <div class="badge-icon badge-warning">
+                    <i data-lucide="lock"></i>
+                </div>
+                <h3>การเข้าสู่ระบบแอดมิน</h3>
+                <p class="subtitle">กรอกรหัสผ่านเพื่อเข้าใช้งานเครื่องมือผู้ดูแลระบบ</p>
+            </div>
+            <form onsubmit="handleAdminLogin(event)">
+                <div class="form-group">
+                    <label for="admin-pass">รหัสผ่านแอดมิน</label>
+                    <input type="password" id="admin-pass" required placeholder="ป้อนรหัสผ่าน 4 หลัก">
+                </div>
+                <div id="admin-login-error" class="error-message hidden">
+                    รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง!
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">
+                    ยืนยันรหัสผ่าน <i data-lucide="log-in"></i>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- VIDEO PLAYER MODAL -->
+    <div id="video-player-modal" class="modal-overlay hidden">
+        <div class="glass-card modal-card video-modal-card">
+            <button class="modal-close" onclick="closeVideoPlayer()">
+                <i data-lucide="x"></i>
+            </button>
+            <h3 id="player-title" class="video-player-title">กำลังเล่นวิดีโอ</h3>
+            <p id="player-desc" class="video-player-desc">รายละเอียดคลิปวิดีโอ</p>
+            
+            <!-- Video Container -->
+            <div class="video-player-wrapper">
+                <div id="video-embed-container" class="video-embed-container">
+                    <!-- Standard video, iframe, or placeholder will go here -->
+                </div>
+            </div>
+
+            <div class="video-player-actions">
+                <button id="mark-watched-btn" class="btn btn-emerald btn-block" onclick="markCurrentVideoWatched()">
+                    <i data-lucide="check-circle2"></i> ยืนยันการรับชมคลิปนี้สำเร็จ
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ADD/EDIT VIDEO MODAL -->
+    <div id="video-edit-modal" class="modal-overlay hidden">
+        <div class="glass-card modal-card">
+            <button class="modal-close" onclick="closeVideoModal()">
+                <i data-lucide="x"></i>
+            </button>
+            <div class="card-header">
+                <h3 id="video-modal-title">เพิ่มวิดีโอการเรียนรู้ใหม่</h3>
+                <p class="subtitle">ระบุรายละเอียดและลิงก์ของคลิปวิดีโอเพื่อให้บริการแก่ผู้ใช้</p>
+            </div>
+            
+            <form id="video-form" onsubmit="handleVideoSave(event)">
+                <input type="hidden" id="video-id">
+                
+                <div class="form-group">
+                    <label for="video-category">หมวดหมู่</label>
+                    <select id="video-category" required>
+                        <option value="ไฟฟ้า">ประหยัดไฟฟ้า 🔌</option>
+                        <option value="น้ำ">ประหยัดน้ำ 💧</option>
+                        <option value="กระดาษ/ขยะ">กระดาษและสิ่งแวดล้อม 📄</option>
+                        <option value="ทั่วไป">ความรู้อนุรักษ์พลังงานทั่วไป 🌱</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="video-title">ชื่อคลิปวิดีโอ</label>
+                    <input type="text" id="video-title" required placeholder="เช่น วิธีปิดเครื่องใช้ไฟฟ้าหลังใช้งาน">
+                </div>
+
+                <div class="form-group">
+                    <label for="video-description">คำอธิบายรายละเอียด</label>
+                    <textarea id="video-description" required rows="3" placeholder="ระบุเนื้อหาหลักหรือความสำคัญของคลิปนี้โดยย่อ"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="video-url">ลิงก์วิดีโอ (YouTube URL หรือลิงก์ Direct MP4)</label>
+                    <input type="text" id="video-url" placeholder="เช่น https://www.youtube.com/watch?v=xxxxxx หรือทิ้งว่างไว้เพื่อใช้ตัวเล่นจำลอง">
+                    <small class="form-help">หากไม่มีคลิปวิดีโอจริง ระบบจะใช้หน้าจอเครื่องเล่นจำลองสวยงามให้โดยอัตโนมัติ</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="video-duration">ความยาวคลิป (เช่น 3:45 นาที)</label>
+                    <input type="text" id="video-duration" placeholder="เช่น 3:15" required>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-block">
+                    บันทึกข้อมูลวิดีโอ <i data-lucide="save"></i>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="toast hidden">
+        <i id="toast-icon" data-lucide="info"></i>
+        <span id="toast-message">ข้อความแจ้งเตือน</span>
+    </div>
+
+    <!-- Lucide script initialization -->
+    <script>
+        // Init icons after DOM load
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+        });
+    </script>
+    <script src="app.js"></script>
+</body>
+</html>
