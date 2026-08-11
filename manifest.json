@@ -1,0 +1,27 @@
+{
+  "name": "EnergySave Video Portal - กฟผ. ไทรน้อย",
+  "short_name": "EnergySave",
+  "description": "ระบบลงทะเบียนและรับชมสื่อการเรียนรู้เพื่อปลูกจิตสำนึกการอนุรักษ์พลังงาน กฟผ. ไทรน้อย",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#eef3fa",
+  "theme_color": "#1B4C9E",
+  "lang": "th",
+  "icons": [
+    {
+      "src": "app_icon.png",
+      "sizes": "1024x1024",
+      "type": "image/png"
+    },
+    {
+      "src": "app_icon.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "app_icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
