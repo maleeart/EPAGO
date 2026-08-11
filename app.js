@@ -178,6 +178,9 @@ function switchView(viewName) {
     // Hide all views
     document.querySelectorAll(".view-section").forEach(sec => sec.classList.remove("active"));
     
+    const homeBtn = document.getElementById("nav-home-btn");
+    const logoutBtn = document.getElementById("nav-logout-btn");
+    
     // Show selected view
     if (viewName === "register") {
         document.getElementById("register-view").classList.add("active");
@@ -189,6 +192,11 @@ function switchView(viewName) {
     } else if (viewName === "admin") {
         document.getElementById("admin-view").classList.add("active");
         document.body.classList.add("admin-mode");
+        
+        // Hide user nav buttons while in admin mode to prevent action conflicts
+        if (homeBtn) homeBtn.classList.add("hidden");
+        if (logoutBtn) logoutBtn.classList.add("hidden");
+        
         renderAdminDashboard();
     }
     
@@ -289,11 +297,8 @@ function handleRegistration(e) {
     currentUser = newParticipant;
     localStorage.setItem(DB_CURRENT_USER_KEY, JSON.stringify(currentUser));
     
-    document.getElementById("user-display-name").innerText = `คุณ${name}`;
-    document.getElementById("nav-home-btn").classList.remove("hidden");
-    
     showToast("ลงทะเบียนและเข้าชมสื่อได้สำเร็จ 🌱");
-    switchView("lobby");
+    checkSession();
     
     // Reset register form
     document.getElementById("register-form").reset();
