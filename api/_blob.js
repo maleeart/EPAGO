@@ -20,12 +20,14 @@ export function getBlobKey(user) {
   }
 }
 
-export async function saveParticipant(data) {
+function checkToken() {
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    console.warn("BLOB_READ_WRITE_TOKEN is missing. Running in local mock mode.");
-    return { url: `mock-url-${Date.now()}` };
+    throw new Error("ฐานข้อมูลคลาวด์ขัดข้อง: ไม่พบ BLOB_READ_WRITE_TOKEN กรุณาเชื่อมต่อ Vercel Blob Storage ในหน้า Vercel Dashboard");
   }
-  
+}
+
+export async function saveParticipant(data) {
+  checkToken();
   const key = getBlobKey(data);
   return await put(`${PREFIX}${key}.json`, JSON.stringify(data), {
     access: "public",
@@ -34,42 +36,9 @@ export async function saveParticipant(data) {
   });
 }
 
-const DEFAULT_PARTICIPANTS = [
-  {
-    emptype: "พนักงาน",
-    empId: "EMP001",
-    name: "นายสมชาย รักษ์พลังงาน",
-    dept: "ฝ่ายเทคโนโลยีสารสนเทศ",
-    regTime: "2026-08-11 08:30",
-    watched: ["vid-1"]
-  },
-  {
-    emptype: "ลูกจ้าง",
-    empId: "",
-    name: "นางสาวสมหญิง ประหยัดดี",
-    dept: "ฝ่ายการเงินและบัญชี",
-    regTime: "2026-08-11 09:15",
-    watched: ["vid-1"]
-  }
-];
-
 export async function readAllParticipants() {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    return [];
-  }
-  
-  let { blobs } = await list({ prefix: PREFIX });
-  
-  // Seed default participants on Vercel Blob if the database is empty
-  if (!blobs || blobs.length === 0) {
-    console.log("EPAGO: Cloud participants empty. Seeding defaults...");
-    for (const p of DEFAULT_PARTICIPANTS) {
-      await saveParticipant(p).catch(e => console.error("Failed to seed participant:", e));
-    }
-    const result = await list({ prefix: PREFIX });
-    blobs = result.blobs;
-  }
-  
+  checkToken();
+  const { blobs } = await list({ prefix: PREFIX });
   if (!blobs || blobs.length === 0) return [];
   
   const rows = await Promise.all(blobs.map(async b => {
@@ -86,12 +55,12 @@ export async function readAllParticipants() {
 }
 
 export async function removeParticipant(url) {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) return;
+  checkToken();
   await del(url);
 }
 
 export async function clearAll() {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) return;
+  checkToken();
   const { blobs } = await list({ prefix: PREFIX });
   if (blobs && blobs.length > 0) {
     await del(blobs.map(b => b.url));
@@ -102,7 +71,7 @@ export async function clearAll() {
 const VIDEOS_BLOB_PATH = "epago/videos.json";
 
 export async function saveVideos(videosList) {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) return;
+  checkToken();
   return await put(VIDEOS_BLOB_PATH, JSON.stringify(videosList), {
     access: "public",
     addRandomSuffix: false,
@@ -111,7 +80,7 @@ export async function saveVideos(videosList) {
 }
 
 export async function readVideos() {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) return null;
+  checkToken();
   try {
     const { blobs } = await list({ prefix: VIDEOS_BLOB_PATH });
     if (!blobs || blobs.length === 0) return null;

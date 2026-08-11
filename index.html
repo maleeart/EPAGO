@@ -75,6 +75,18 @@
             <img class="hero-mascot" src="ENGY PNG/engy 26.png" alt="ENGY Mascot">
         </div>
 
+        <!-- DATABASE ERROR OVERLAY -->
+        <div id="database-error-overlay" class="hidden" style="margin-bottom: 2rem; padding: 1.5rem; border-radius: 0.75rem; background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(239, 68, 68, 0.25)); border: 2px solid var(--red); color: var(--red); box-shadow: 0 8px 32px rgba(239, 68, 68, 0.15);">
+            <div style="display: flex; align-items: flex-start; gap: 1rem;">
+                <i data-lucide="alert-triangle" style="width: 32px; height: 32px; flex-shrink: 0; stroke-width: 2; color: var(--red);"></i>
+                <div>
+                    <h3 style="margin: 0 0 0.5rem 0; font-size: 1.1rem; font-weight: 700; color: var(--red);">⚠️ ตรวจพบข้อผิดพลาดของระบบฐานข้อมูล</h3>
+                    <p id="database-error-message" style="margin: 0; font-size: 0.95rem; line-height: 1.5; color: var(--text-main);">ไม่พบการเชื่อมต่อฐานข้อมูลคลาวด์ Vercel Blob (ไม่มีการตั้งค่า BLOB_READ_WRITE_TOKEN ใน Vercel Dashboard)</p>
+                    <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem; font-weight: 600; color: var(--text-main);">กรุณาตั้งค่าเชื่อมต่อฐานข้อมูลเพื่อเปิดระบบลงทะเบียนและแดชบอร์ดแอดมินที่แท้จริง</p>
+                </div>
+            </div>
+        </div>
+
         <!-- VIEW 1: REGISTRATION -->
         <section id="register-view" class="view-section active">
             <!-- ENGY Greeting speech bubble -->

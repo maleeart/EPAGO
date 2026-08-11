@@ -185,11 +185,20 @@ document.addEventListener("DOMContentLoaded", () => {
 
 // Check if the server API endpoints are available
 async function checkOnlineStatus() {
+    const errorOverlay = document.getElementById("database-error-overlay");
+    const errorMessage = document.getElementById("database-error-message");
+    
     if (window.location.protocol === "file:") {
         isOnlineDb = false;
-        console.log("EPAGO: Local file:// mode. Using LocalStorage database fallback.");
+        console.log("EPAGO: Local file:// mode. Database connection unavailable.");
+        if (errorOverlay && errorMessage) {
+            errorOverlay.classList.remove("hidden");
+            errorMessage.innerHTML = "ระบบถูกเปิดผ่านไฟล์บนเครื่องโดยตรง (<code>file://</code>) ซึ่งไม่สนับสนุนสิทธิ์ความปลอดภัยในการเชื่อมต่อฐานข้อมูลคลาวด์ Vercel Blob<br><b>คำแนะนำ:</b> กรุณารันระบบผ่าน Vercel CLI (<code>vercel dev</code>) หรือโฮสต์เซิร์ฟเวอร์จำลอง (Local HTTP Server) เพื่อทำการพัฒนาต่อครับ";
+        }
+        disableInteractiveForms();
         return;
     }
+    
     try {
         const res = await fetch("/api/db-status").catch(() => null);
         if (res && res.ok) {
@@ -198,24 +207,68 @@ async function checkOnlineStatus() {
         } else {
             isOnlineDb = false;
         }
-        console.log("EPAGO: Database connection status: " + (isOnlineDb ? "ONLINE (Vercel Cloud)" : "OFFLINE (LocalStorage Fallback)"));
         
         if (isOnlineDb) {
+            if (errorOverlay) errorOverlay.classList.add("hidden");
+            enableInteractiveForms();
             await migrateLocalDataToCloud();
             await syncVideosOnline();
             if (currentUser) {
                 syncCurrentUserWatchedProgress();
             }
         } else {
-            // Load fallbacks immediately if database is offline or not connected
-            videos = JSON.parse(localStorage.getItem(DB_VIDEOS_KEY)) || DEFAULT_VIDEOS;
-            participants = JSON.parse(localStorage.getItem(DB_USERS_KEY)) || DEFAULT_PARTICIPANTS;
-            watchedLogs = JSON.parse(localStorage.getItem(DB_WATCHED_KEY)) || DEFAULT_WATCHED_LOGS;
+            console.error("EPAGO: Database connection failed. Vercel Blob Storage token is missing.");
+            if (errorOverlay && errorMessage) {
+                errorOverlay.classList.remove("hidden");
+                errorMessage.innerHTML = "ไม่สามารถเชื่อมต่อฐานข้อมูลคลาวด์ Vercel Blob ได้ เนื่องจากตรวจไม่พบค่าตัวแปรสิทธิ์ <code>BLOB_READ_WRITE_TOKEN</code> ในสภาพแวดล้อมระบบ Vercel Dashboard ของท่าน<br><b>คำแนะนำ:</b> กรุณาเข้าที่เมนู Storage ในโครงการ Vercel ของท่าน แล้วกดปุ่ม Connect Vercel Blob หรือเพิ่มตัวแปร ENV ให้ถูกต้องครับ";
+            }
+            disableInteractiveForms();
+            
+            // Clear mock fallbacks to prevent simulating empty databases
+            videos = [];
+            participants = [];
+            watchedLogs = {};
         }
     } catch (e) {
         isOnlineDb = false;
-        console.log("EPAGO: Database check failed. Fallback to LocalStorage.");
+        console.error("EPAGO: Database check failed:", e);
+        if (errorOverlay && errorMessage) {
+            errorOverlay.classList.remove("hidden");
+            errorMessage.innerText = "การตรวจสอบการเชื่อมต่อเซิร์ฟเวอร์ผิดพลาด: " + (e.message || e);
+        }
+        disableInteractiveForms();
     }
+}
+
+function disableInteractiveForms() {
+    const regForm = document.getElementById("register-form");
+    const retForm = document.getElementById("returning-user-form");
+    if (regForm) {
+        regForm.querySelectorAll("input, button, select").forEach(el => el.disabled = true);
+        const submitBtn = regForm.querySelector("button[type='submit']");
+        if (submitBtn) submitBtn.innerHTML = "❌ ฐานข้อมูลเชื่อมต่อขัดข้อง";
+    }
+    if (retForm) {
+        retForm.querySelectorAll("input, button, select").forEach(el => el.disabled = true);
+        const submitBtn = retForm.querySelector("button[type='submit']");
+        if (submitBtn) submitBtn.innerHTML = "❌ ฐานข้อมูลเชื่อมต่อขัดข้อง";
+    }
+}
+
+function enableInteractiveForms() {
+    const regForm = document.getElementById("register-form");
+    const retForm = document.getElementById("returning-user-form");
+    if (regForm) {
+        regForm.querySelectorAll("input, button, select").forEach(el => el.disabled = false);
+        const submitBtn = regForm.querySelector("button[type='submit']");
+        if (submitBtn) submitBtn.innerHTML = 'ลงทะเบียนและเข้าชม <i data-lucide="arrow-right"></i>';
+    }
+    if (retForm) {
+        retForm.querySelectorAll("input, button, select").forEach(el => el.disabled = false);
+        const submitBtn = retForm.querySelector("button[type='submit']");
+        if (submitBtn) submitBtn.innerHTML = 'เข้าสู่ระบบผู้ใช้งาน <i data-lucide="log-in"></i>';
+    }
+    lucide.createIcons();
 }
 
 // Sync current user watched videos from cloud
