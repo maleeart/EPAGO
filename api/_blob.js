@@ -44,7 +44,7 @@ export async function readAllParticipants() {
   
   const rows = await Promise.all(blobs.map(async b => {
     try {
-      const data = await fetch(b.url).then(r => r.json());
+      const data = await fetch(`${b.url}?t=${Date.now()}`).then(r => r.json());
       return { ...data, _blobUrl: b.url };
     } catch (e) {
       console.error(`Failed to fetch blob at ${b.url}:`, e);
