@@ -1,5 +1,7 @@
 import { readVideos, saveVideos } from "./_blob.js";
 
+const CURRENT_VIDEOS_VERSION = "v1.5";
+
 const DEFAULT_VIDEOS = [
   {
     id: "vid-1",
@@ -15,13 +17,28 @@ export default async function handler(req, res) {
   if (req.method !== "GET") return res.status(405).json({ error: "method not allowed" });
 
   try {
-    let videos = await readVideos();
+    let rawData = await readVideos();
+    let videos = null;
+    let version = "";
+
+    if (rawData) {
+      if (Array.isArray(rawData)) {
+        videos = rawData;
+      } else if (rawData.videos) {
+        videos = rawData.videos;
+        version = rawData.version || "";
+      }
+    }
     
-    // Seed default videos if videos.json doesn't exist on Vercel Blob yet
-    if (!videos) {
+    // Seed or Force Update if version mismatch
+    if (!videos || version !== CURRENT_VIDEOS_VERSION) {
       videos = DEFAULT_VIDEOS;
       if (process.env.BLOB_READ_WRITE_TOKEN) {
-        await saveVideos(videos).catch(e => console.error("Failed to seed default videos:", e));
+        const payload = {
+          version: CURRENT_VIDEOS_VERSION,
+          videos: DEFAULT_VIDEOS
+        };
+        await saveVideos(payload).catch(e => console.error("Failed to seed/migrate videos:", e));
       }
     }
     

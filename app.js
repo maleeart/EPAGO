@@ -242,6 +242,12 @@ async function syncVideosOnline() {
         if (response.ok && resData.ok && resData.videos) {
             videos = resData.videos;
             localStorage.setItem(DB_VIDEOS_KEY, JSON.stringify(videos));
+            
+            // Immediately update the UI components with the fresh video database
+            renderUserLobby();
+            if (document.getElementById("admin-view").classList.contains("active")) {
+                renderAdminDashboard();
+            }
         }
     } catch (e) {
         console.warn("Failed to sync videos from cloud:", e);
