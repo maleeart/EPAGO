@@ -835,21 +835,6 @@ function renderAdminParticipantsTable() {
         const totalCount = videos.length;
         const watchedCount = userWatched.filter(id => videos.some(v => v.id === id)).length;
         
-        // Find unwatched videos
-        const unwatched = videos.filter(v => !userWatched.includes(v.id));
-        let unwatchedHtml = "";
-        if (unwatched.length > 0 && totalCount > 0) {
-            // Renders list of missing videos with category tag and red cross icon
-            unwatchedHtml = `<div style="font-size: 0.78rem; color: var(--red); margin-top: 6px; font-weight: 500; text-align: left; line-height: 1.35;">
-                <span style="font-weight: 700;">ขาดเรื่อง:</span><br>
-                ${unwatched.map(v => `<span style="opacity: 0.85;">❌ ${v.title}</span>`).join("<br>")}
-            </div>`;
-        } else if (totalCount > 0) {
-            unwatchedHtml = `<div style="font-size: 0.78rem; color: var(--success); margin-top: 6px; font-weight: 700; text-align: left;">
-                ✔️ ชมครบถ้วนทุกคลิปแล้ว
-            </div>`;
-        }
-        
         const tr = document.createElement("tr");
         tr.innerHTML = `
             <td><span class="category-pill" style="background-color: #fff8e0; border-color: rgba(253,197,0,0.25); color: var(--yellow-d);">${user.emptype || 'พนักงาน'}</span></td>
@@ -858,11 +843,10 @@ function renderAdminParticipantsTable() {
             <td>${user.dept}</td>
             <td style="font-family: 'Outfit', sans-serif; font-size: 0.85rem; color: var(--text-secondary);">${user.regTime}</td>
             <td>
-                <span class="watched-status-pill ${watchedCount === totalCount && totalCount > 0 ? 'watched' : ''}">
+                <span class="watched-status-pill ${watchedCount === totalCount && totalCount > 0 ? 'watched' : ''}" style="cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem;" onclick="showParticipantDetails('${userKey}')" title="คลิกดูประวัติรายบุคคล">
                     <i data-lucide="${watchedCount === totalCount && totalCount > 0 ? 'trophy' : 'eye'}"></i>
                     <span>ชมแล้ว ${watchedCount}/${totalCount} คลิป</span>
                 </span>
-                ${unwatchedHtml}
             </td>
         `;
         tbody.appendChild(tr);
@@ -920,6 +904,67 @@ function renderAffiliationVideoStats() {
 
     // Synchronize the bottom participants list table with this affiliation filter
     renderAdminParticipantsTable();
+}
+
+// Show popup details of watched/unwatched videos for a specific participant
+function showParticipantDetails(userKey) {
+    const user = participants.find(p => (p.empId && p.empId === userKey) || (!p.empId && p.name === userKey));
+    if (!user) return;
+    
+    const userWatched = watchedLogs[userKey] || [];
+    const totalCount = videos.length;
+    
+    const body = document.getElementById("participant-detail-body");
+    if (!body) return;
+    
+    body.innerHTML = `
+        <div style="background-color: var(--bg-light); padding: 0.9rem; border-radius: 0.5rem; margin-bottom: 1.25rem; border: 1px solid rgba(27,76,158,0.12);">
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.6rem 0.4rem; font-size: 0.92rem; color: var(--text-primary);">
+                <div><strong>ประเภทบุคลากร:</strong> ${user.emptype}</div>
+                <div><strong>รหัสพนักงาน:</strong> ${user.empId || '-'}</div>
+                <div style="grid-column: 1/-1;"><strong>ชื่อ - สกุล:</strong> ${user.name}</div>
+                <div><strong>สังกัด:</strong> ${user.dept}</div>
+                <div><strong>เวลาลงทะเบียน:</strong> ${user.regTime}</div>
+            </div>
+        </div>
+        
+        <h4 style="color: var(--blue-d); margin-bottom: 0.55rem; font-size: 0.95rem; font-weight: 700; display: flex; align-items: center; gap: 0.3rem;">
+            <i data-lucide="line-chart" style="width: 16px; height: 16px; color: var(--blue);"></i>
+            ความคืบหน้าการรับชม (${userWatched.length}/${totalCount} คลิป)
+        </h4>
+        
+        <div style="max-height: 250px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.5rem; padding-right: 4px;">
+            ${videos.length === 0 ? `
+                <div style="text-align: center; color: var(--text-secondary); font-size: 0.9rem; padding: 1rem 0;">
+                    ไม่มีคลิปวิดีโอในระบบ
+                </div>
+            ` : videos.map(video => {
+                const isWatched = userWatched.includes(video.id);
+                return `
+                    <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.55rem 0.75rem; background-color: ${isWatched ? 'rgba(74,222,128,0.06)' : 'rgba(239,68,68,0.04)'}; border: 1px solid ${isWatched ? 'rgba(74,222,128,0.2)' : 'rgba(239,68,68,0.15)'}; border-radius: 0.4rem;">
+                        <div style="font-size: 0.88rem; font-weight: 600; color: var(--text-primary); text-align: left; flex: 1; padding-right: 0.5rem; line-height: 1.35;">
+                            ${video.title}
+                        </div>
+                        <div style="flex-shrink: 0;">
+                            ${isWatched 
+                                ? `<span style="color: var(--success); font-weight: 700; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 0.2rem;"><i data-lucide="check-circle" style="width:14px; height:14px;"></i> ชมแล้ว</span>` 
+                                : `<span style="color: var(--red); font-weight: 700; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 0.2rem;"><i data-lucide="x-circle" style="width:14px; height:14px;"></i> ยังไม่ชม</span>`
+                            }
+                        </div>
+                    </div>
+                `;
+            }).join("")}
+        </div>
+    `;
+    
+    // Show Modal
+    document.getElementById("participant-detail-modal").classList.remove("hidden");
+    lucide.createIcons();
+}
+
+function closeParticipantDetailModal() {
+    document.getElementById("participant-detail-modal").classList.add("hidden");
+    document.getElementById("participant-detail-body").innerHTML = "";
 }
 
 // --- CRUD: Add / Edit Videos ---
