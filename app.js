@@ -46,17 +46,17 @@ const DEFAULT_VIDEOS = [
 // Default Participants Seed Data for Demo
 const DEFAULT_PARTICIPANTS = [
     {
+        emptype: "พนักงาน",
         empId: "EMP001",
         name: "นายสมชาย รักษ์พลังงาน",
         dept: "ฝ่ายเทคโนโลยีสารสนเทศ",
-        phone: "0812345678",
         regTime: "2026-08-11 08:30"
     },
     {
+        emptype: "ลูกจ้าง",
         empId: "EMP002",
         name: "นางสาวสมหญิง ประหยัดดี",
         dept: "ฝ่ายการเงินและบัญชี",
-        phone: "0898765432",
         regTime: "2026-08-11 09:15"
     }
 ];
@@ -74,12 +74,32 @@ let currentUser = null;
 let currentPlayingVideo = null;
 let playSimInterval = null;
 
+const UNITS = ["สก.ชธธ.","อบค.","อบฟ.","อบย.","อรอ.","อคม.","อหข.","อื่นๆ"];
+
 // --- Initialize App ---
 document.addEventListener("DOMContentLoaded", () => {
     initDatabase();
     checkSession();
     renderUserLobby();
     
+    // Render units radio buttons
+    const unitsWrapper = document.getElementById("units-wrapper");
+    if (unitsWrapper) {
+        unitsWrapper.innerHTML = UNITS.map(u => 
+            `<label class="opt"><input type="radio" name="unit" value="${u}" required><span>${u}</span></label>`
+        ).join("");
+        
+        unitsWrapper.addEventListener("change", (e) => {
+            const otherInput = document.getElementById("reg-dept-other");
+            if (e.target.name === "unit") {
+                const isOther = e.target.value === "อื่นๆ";
+                otherInput.classList.toggle("hidden", !isOther);
+                otherInput.required = isOther;
+                if (isOther) otherInput.focus();
+            }
+        });
+    }
+
     // Admin login overlay backdrop click close
     document.getElementById("admin-login-modal").addEventListener("click", (e) => {
         if (e.target.id === "admin-login-modal") closeAdminLogin();
@@ -175,25 +195,32 @@ function showToast(message, isError = false) {
 function handleRegistration(e) {
     e.preventDefault();
     
+    const emptypeEl = document.querySelector('input[name="emptype"]:checked');
     const name = document.getElementById("reg-name").value.trim();
-    const dept = document.getElementById("reg-dept").value.trim();
     const empId = document.getElementById("reg-empid").value.trim().toUpperCase();
-    const phone = document.getElementById("reg-phone").value.trim();
     
-    if (!name || !dept || !empId || !phone) {
+    const unitEl = document.querySelector('input[name="unit"]:checked');
+    let dept = unitEl ? unitEl.value : "";
+    if (dept === "อื่นๆ") {
+        dept = document.getElementById("reg-dept-other").value.trim();
+    }
+    
+    if (!emptypeEl || !name || !empId || !dept) {
         showToast("กรุณากรอกข้อมูลให้ครบถ้วนทุกช่อง", true);
         return;
     }
+    
+    const emptype = emptypeEl.value;
     
     // Format current date and time
     const now = new Date();
     const formattedDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
     
     const newParticipant = {
+        emptype,
         empId,
         name,
         dept,
-        phone,
         regTime: formattedDate
     };
     
@@ -227,6 +254,11 @@ function handleRegistration(e) {
     
     // Reset register form
     document.getElementById("register-form").reset();
+    const otherInput = document.getElementById("reg-dept-other");
+    if (otherInput) {
+        otherInput.classList.add("hidden");
+        otherInput.required = false;
+    }
 }
 
 // --- User Video Lobby rendering ---
@@ -631,10 +663,10 @@ function renderAdminParticipantsTable() {
         
         const tr = document.createElement("tr");
         tr.innerHTML = `
+            <td><span class="category-pill" style="background-color: #fff8e0; border-color: rgba(253,197,0,0.25); color: var(--yellow-d);">${user.emptype || 'พนักงาน'}</span></td>
             <td style="font-family: 'Outfit', sans-serif; font-weight: 500;">${user.empId}</td>
             <td><strong>${user.name}</strong></td>
             <td>${user.dept}</td>
-            <td style="font-family: 'Outfit', sans-serif;">${user.phone}</td>
             <td style="font-family: 'Outfit', sans-serif; font-size: 0.85rem; color: var(--text-secondary);">${user.regTime}</td>
             <td>
                 <span class="watched-status-pill ${watchedCount === totalCount && totalCount > 0 ? 'watched' : ''}">
@@ -747,7 +779,7 @@ function exportParticipantsToCSV() {
     }
     
     // Header Row in Thai
-    let csvContent = "รหัสพนักงาน,ชื่อ-นามสกุล,แผนก/ฝ่าย,เบอร์โทรศัพท์,วันเวลาลงทะเบียน,จำนวนวิดีโอที่ดูเสร็จสิ้น,สถานะการชมคลังสื่อทั้งหมด\n";
+    let csvContent = "ประเภทบุคลากร,รหัสพนักงาน,ชื่อ - สกุล,สังกัด,วันเวลาลงทะเบียน,จำนวนวิดีโอที่ดูเสร็จสิ้น,สถานะการชมคลังสื่อทั้งหมด\n";
     
     participants.forEach(user => {
         const userWatched = watchedLogs[user.empId] || [];
@@ -758,8 +790,9 @@ function exportParticipantsToCSV() {
         // Escape commas and double quotes for clean CSV
         const safeName = `"${user.name.replace(/"/g, '""')}"`;
         const safeDept = `"${user.dept.replace(/"/g, '""')}"`;
+        const typeText = user.emptype || "พนักงาน";
         
-        csvContent += `${user.empId},${safeName},${safeDept},'${user.phone},${user.regTime},${watchedCount}/${totalCount},${statusText}\n`;
+        csvContent += `${typeText},${user.empId},${safeName},${safeDept},${user.regTime},${watchedCount}/${totalCount},${statusText}\n`;
     });
     
     // Add UTF-8 BOM byte sequence (EF BB BF) so Microsoft Excel opens it with proper Thai characters encoding

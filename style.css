@@ -353,6 +353,40 @@ input:focus, select:focus, textarea:focus {
     box-shadow: 0 0 0 3px rgba(27, 76, 158, 0.13);
 }
 
+.opt {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.55rem 0.75rem;
+    cursor: pointer;
+    border: 1.5px solid var(--border-color);
+    border-radius: 8px;
+    background-color: #fbfcfe;
+    transition: all var(--transition-fast);
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.opt:hover {
+    background-color: #f4f8ff;
+    border-color: #cfdcf2;
+}
+
+.opt input {
+    accent-color: var(--blue);
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    cursor: pointer;
+}
+
+.opt:has(input:checked) {
+    background-color: #fff8e0;
+    border-color: var(--yellow);
+    font-weight: 700;
+    box-shadow: 0 2px 8px rgba(253, 197, 0, 0.08);
+}
+
 .form-help {
     display: block;
     margin-top: 0.3rem;
