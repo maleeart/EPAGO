@@ -131,11 +131,14 @@ function switchView(viewName) {
     // Show selected view
     if (viewName === "register") {
         document.getElementById("register-view").classList.add("active");
+        document.body.classList.remove("admin-mode");
     } else if (viewName === "lobby") {
         document.getElementById("lobby-view").classList.add("active");
+        document.body.classList.remove("admin-mode");
         renderUserLobby();
     } else if (viewName === "admin") {
         document.getElementById("admin-view").classList.add("active");
+        document.body.classList.add("admin-mode");
         renderAdminDashboard();
     }
     

@@ -37,9 +37,30 @@
     </header>
 
     <main class="main-container">
+        <!-- Hero Banner for EGAT / EnergySave theme -->
+        <div class="hero-banner">
+            <div class="hero-content">
+                <img class="hero-logo" src="LogoEGAT-only.png" alt="โลโก้ การไฟฟ้าฝ่ายผลิตแห่งประเทศไทย">
+                <div class="hero-text">
+                    <h1>EnergySave Video Portal</h1>
+                    <p>ระบบลงทะเบียนและรับชมสื่อการเรียนรู้การอนุรักษ์พลังงาน | กฟผ. ไทรน้อย</p>
+                </div>
+            </div>
+            <img class="hero-mascot" src="ENGY PNG/engy 26.png" alt="ENGY Mascot">
+        </div>
+
         <!-- VIEW 1: REGISTRATION -->
         <section id="register-view" class="view-section active">
-            <div class="glass-card register-card">
+            <!-- ENGY Greeting speech bubble -->
+            <div class="welcome-mascot-card card">
+                <img src="ENGY PNG/engy 5.png" alt="ENGY Waving" class="mascot-waving">
+                <div class="mascot-speech">
+                    <h3>สวัสดีครับ! ผม <span>ENGY</span> ครับ ⚡</h3>
+                    <p>ยินดีต้อนรับพี่ๆ พนักงานและลูกจ้าง กฟผ. ไทรน้อย ทุกท่านเข้ารับชมสื่อการเรียนรู้เพื่อรณรงค์และปลูกจิตสำนึกการอนุรักษ์พลังงานในชีวิตประจำวันครับ กรุณากรอกข้อมูลลงทะเบียนสั้นๆ ด้านล่างนี้เพื่อเริ่มต้นเข้าสู่หน้าต่างรับชมกันได้เลยนะครับ!</p>
+                </div>
+            </div>
+
+            <div class="card register-card">
                 <div class="card-header text-center">
                     <div class="badge-icon">
                         <i data-lucide="user-check"></i>
@@ -79,11 +100,14 @@
 
         <!-- VIEW 2: VIDEO LOBBY -->
         <section id="lobby-view" class="view-section">
-            <!-- User Status Panel -->
-            <div class="user-welcome-panel glass-card">
-                <div class="welcome-text">
-                    <h3>ยินดีต้อนรับ, <span id="user-display-name" class="highlight-text">คุณผู้ใช้งาน</span> 🌱</h3>
-                    <p>ร่วมเป็นส่วนหนึ่งในการประหยัดพลังงานเพื่อองค์กรและโลกของเรา</p>
+            <!-- User Status Panel with ENGY Mascot -->
+            <div class="user-welcome-panel card">
+                <div class="welcome-left">
+                    <img src="ENGY PNG/engy 30.png" alt="ENGY Mascot" class="welcome-mascot-img">
+                    <div class="welcome-text">
+                        <h3>ยินดีต้อนรับ, <span id="user-display-name" class="highlight-text">คุณผู้ใช้งาน</span> 🌱</h3>
+                        <p>มาร่วมเรียนรู้วิธีการอนุรักษ์พลังงานง่ายๆ และสร้างพฤติกรรมประหยัดพลังงานร่วมกัน เพื่อความยั่งยืนขององค์กรและโลกของเรากันนะครับ</p>
+                    </div>
                 </div>
                 <div class="welcome-stats">
                     <div class="stat-item">
@@ -98,6 +122,7 @@
                     </div>
                 </div>
             </div>
+
 
             <!-- Video Section Header -->
             <div class="section-title-wrapper">
