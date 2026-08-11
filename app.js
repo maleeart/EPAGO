@@ -823,7 +823,7 @@ function renderAdminParticipantsTable() {
     // Filter participants based on selected unit (robust matching for custom inputs under "อื่นๆ")
     const filteredParticipants = participants.filter(p => {
         if (selectedUnit === "ทั้งหมด") return true;
-        if (selectedUnit === "อื่นๆ") return p.dept === "อื่นๆ" || (p.dept && p.dept.startsWith("อื่นๆ:"));
+        if (selectedUnit === "อื่นๆ") return p.dept === "อื่นๆ" || (p.dept && p.dept.startsWith("อื่นๆ:")) || !UNITS.includes(p.dept);
         return p.dept === selectedUnit;
     });
     
@@ -877,7 +877,7 @@ function renderAffiliationVideoStats() {
     // Filter participants in this affiliation (robust matching for custom inputs under "อื่นๆ")
     const filteredUsers = participants.filter(p => {
         if (selectedUnit === "ทั้งหมด") return true;
-        if (selectedUnit === "อื่นๆ") return p.dept === "อื่นๆ" || (p.dept && p.dept.startsWith("อื่นๆ:"));
+        if (selectedUnit === "อื่นๆ") return p.dept === "อื่นๆ" || (p.dept && p.dept.startsWith("อื่นๆ:")) || !UNITS.includes(p.dept);
         return p.dept === selectedUnit;
     });
     
