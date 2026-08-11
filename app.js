@@ -81,7 +81,6 @@ document.addEventListener("DOMContentLoaded", () => {
     initDatabase();
     checkSession();
     renderUserLobby();
-    populateReturningUsers();
     
     // Render units radio buttons
     const unitsWrapper = document.getElementById("units-wrapper");
@@ -108,6 +107,22 @@ document.addEventListener("DOMContentLoaded", () => {
             const isEmp = e.target.value === "พนักงาน";
             const empidGroup = document.getElementById("empid-group");
             const empidInput = document.getElementById("reg-empid");
+            
+            if (empidGroup && empidInput) {
+                empidGroup.classList.toggle("hidden", !isEmp);
+                empidInput.required = isEmp;
+                if (!isEmp) empidInput.value = "";
+            }
+        });
+    });
+
+    // Toggle Employee ID field based on Staff Type for returning users
+    const retEmpTypeRadios = document.querySelectorAll('input[name="ret-emptype"]');
+    retEmpTypeRadios.forEach(radio => {
+        radio.addEventListener("change", (e) => {
+            const isEmp = e.target.value === "พนักงาน";
+            const empidGroup = document.getElementById("ret-empid-group");
+            const empidInput = document.getElementById("ret-empid");
             
             if (empidGroup && empidInput) {
                 empidGroup.classList.toggle("hidden", !isEmp);
@@ -317,30 +332,6 @@ function handleRegistration(e) {
         empidInput.required = true;
     }
     
-    // Update returning users list
-    populateReturningUsers();
-}
-
-// Populate Returning User dropdown
-function populateReturningUsers() {
-    const select = document.getElementById("returning-user-select");
-    if (!select) return;
-    
-    select.innerHTML = '<option value="" disabled selected>-- เลือกรายชื่อผู้เคยลงทะเบียน --</option>';
-    if (participants.length === 0) {
-        select.innerHTML += '<option value="" disabled>ไม่มีรายชื่อผู้ลงทะเบียนก่อนหน้า</option>';
-        return;
-    }
-    
-    // Sort participants by name for easy search
-    const sorted = [...participants].sort((a, b) => a.name.localeCompare(b.name, 'th'));
-    sorted.forEach(p => {
-        const detail = p.empId ? `รหัส: ${p.empId}` : p.dept;
-        const opt = document.createElement("option");
-        opt.value = p.empId ? p.empId : p.name;
-        opt.innerText = `${p.name} (${p.emptype} - ${detail})`;
-        select.appendChild(opt);
-    });
 }
 
 // Switch between New Registration and Returning User Login Mode
@@ -360,22 +351,47 @@ function switchRegisterMode(mode) {
         returningForm.classList.remove("hidden");
         regNewBtn.classList.remove("active");
         regReturningBtn.classList.add("active");
-        populateReturningUsers();
+        
+        // Reset inputs when switching to returning tab
+        document.getElementById("returning-user-form").reset();
+        const retEmpidGroup = document.getElementById("ret-empid-group");
+        const retEmpidInput = document.getElementById("ret-empid");
+        if (retEmpidGroup && retEmpidInput) {
+            retEmpidGroup.classList.remove("hidden");
+            retEmpidInput.required = true;
+        }
     }
 }
 
-// Handle Returning User quick login
+// Handle Returning User quick login by credentials
 function handleReturningLogin(e) {
     e.preventDefault();
-    const select = document.getElementById("returning-user-select");
-    const userKey = select.value;
-    if (!userKey) {
-        showToast("กรุณาเลือกรายชื่อของคุณ", true);
+    
+    const emptypeEl = document.querySelector('input[name="ret-emptype"]:checked');
+    const name = document.getElementById("ret-name").value.trim();
+    
+    if (!emptypeEl || !name) {
+        showToast("กรุณากรอกประเภทบุคลากร และชื่อ-นามสกุล", true);
         return;
     }
     
-    // Find user by empId or name
-    const user = participants.find(p => (p.empId && p.empId === userKey) || (!p.empId && p.name === userKey));
+    const emptype = emptypeEl.value;
+    let empId = "";
+    if (emptype === "พนักงาน") {
+        empId = document.getElementById("ret-empid").value.trim().toUpperCase();
+        if (!empId) {
+            showToast("กรุณากรอกรหัสพนักงาน", true);
+            return;
+        }
+    }
+    
+    // Find user in local database matching exactly (ignores double spaces)
+    const user = participants.find(p => 
+        p.emptype === emptype &&
+        p.name.replace(/\s+/g, '') === name.replace(/\s+/g, '') &&
+        (emptype === "ลูกจ้าง" || (p.empId && p.empId === empId))
+    );
+    
     if (user) {
         currentUser = user;
         localStorage.setItem(DB_CURRENT_USER_KEY, JSON.stringify(currentUser));
@@ -384,8 +400,14 @@ function handleReturningLogin(e) {
         
         // Reset returning form
         document.getElementById("returning-user-form").reset();
+        const retEmpidGroup = document.getElementById("ret-empid-group");
+        const retEmpidInput = document.getElementById("ret-empid");
+        if (retEmpidGroup && retEmpidInput) {
+            retEmpidGroup.classList.remove("hidden");
+            retEmpidInput.required = true;
+        }
     } else {
-        showToast("ไม่พบข้อมูลผู้ใช้งาน", true);
+        showToast("ไม่พบข้อมูลลงทะเบียนในระบบ กรุณาตรวจสอบหรือลงทะเบียนใหม่", true);
     }
 }
 
@@ -985,7 +1007,6 @@ function clearAllParticipants() {
         watchedLogs = {};
         localStorage.setItem(DB_USERS_KEY, JSON.stringify(participants));
         localStorage.setItem(DB_WATCHED_KEY, JSON.stringify(watchedLogs));
-        populateReturningUsers();
         showToast("ล้างประวัติผู้เข้าร่วมกิจกรรมทั้งหมดแล้ว");
         renderAdminDashboard();
     }
