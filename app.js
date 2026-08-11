@@ -149,7 +149,7 @@ document.addEventListener("DOMContentLoaded", () => {
 // Seed data storage if empty
 function initDatabase() {
     // Database Versioning / Force Reset for default videos
-    const DB_VERSION = "v1.2";
+    const DB_VERSION = "v1.3";
     if (localStorage.getItem("db_version") !== DB_VERSION) {
         localStorage.setItem(DB_VIDEOS_KEY, JSON.stringify(DEFAULT_VIDEOS));
         localStorage.setItem("db_version", DB_VERSION);

@@ -2,6 +2,16 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8">
+    <script>
+        // Force database reset on version mismatch (inline to ensure it runs immediately)
+        (function() {
+            var CURRENT_VERSION = "v1.3";
+            if (localStorage.getItem("db_version") !== CURRENT_VERSION) {
+                localStorage.removeItem("energysave_videos");
+                localStorage.setItem("db_version", CURRENT_VERSION);
+            }
+        })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EnergySave Video Portal - ปลูกจิตสำนึกรักษ์พลังงาน</title>
     
