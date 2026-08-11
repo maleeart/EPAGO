@@ -119,6 +119,43 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
 
+    // Toggle Employee ID field based on Staff Type for edit modal
+    const editEmpTypeRadios = document.querySelectorAll('input[name="edit-emptype"]');
+    editEmpTypeRadios.forEach(radio => {
+        radio.addEventListener("change", (e) => {
+            const isEmp = e.target.value === "พนักงาน";
+            const empidGroup = document.getElementById("edit-empid-group");
+            const empidInput = document.getElementById("edit-empid");
+            
+            if (empidGroup && empidInput) {
+                empidGroup.classList.toggle("hidden", !isEmp);
+                empidInput.required = isEmp;
+                if (!isEmp) empidInput.value = "";
+            }
+        });
+    });
+
+    // Toggle custom department input for edit modal
+    const editDeptSelect = document.getElementById("edit-dept");
+    if (editDeptSelect) {
+        editDeptSelect.addEventListener("change", (e) => {
+            const isOther = e.target.value === "อื่นๆ";
+            const otherGroup = document.getElementById("edit-dept-other-group");
+            const otherInput = document.getElementById("edit-dept-other");
+            
+            if (otherGroup && otherInput) {
+                otherGroup.classList.toggle("hidden", !isOther);
+                otherInput.required = isOther;
+                if (isOther) otherInput.focus();
+            }
+        });
+    }
+
+    // Backdrop click close for edit modal
+    document.getElementById("participant-edit-modal").addEventListener("click", (e) => {
+        if (e.target.id === "participant-edit-modal") closeParticipantEditModal();
+    });
+
     // Admin login overlay backdrop click close
     document.getElementById("admin-login-modal").addEventListener("click", (e) => {
         if (e.target.id === "admin-login-modal") closeAdminLogin();
@@ -137,8 +174,11 @@ async function checkOnlineStatus() {
         isOnlineDb = res !== null && res.status !== 404;
         console.log("EPAGO: Database connection status: " + (isOnlineDb ? "ONLINE (Vercel Cloud)" : "OFFLINE (LocalStorage Fallback)"));
         
-        if (isOnlineDb && currentUser) {
-            syncCurrentUserWatchedProgress();
+        if (isOnlineDb) {
+            await migrateLocalDataToCloud();
+            if (currentUser) {
+                syncCurrentUserWatchedProgress();
+            }
         }
     } catch (e) {
         isOnlineDb = false;
@@ -168,6 +208,56 @@ async function syncCurrentUserWatchedProgress() {
         }
     } catch (e) {
         console.warn("Failed to sync current user watch progress:", e);
+    }
+}
+
+// Migrate local storage participants and watched logs to cloud Vercel Blob
+async function migrateLocalDataToCloud() {
+    if (!isOnlineDb) return;
+    if (localStorage.getItem("db_migrated_v1.4") === "true") return;
+    
+    const localParticipantsRaw = localStorage.getItem(DB_USERS_KEY);
+    const localWatchedRaw = localStorage.getItem(DB_WATCHED_KEY);
+    if (!localParticipantsRaw) {
+        localStorage.setItem("db_migrated_v1.4", "true");
+        return;
+    }
+    
+    try {
+        const localParts = JSON.parse(localParticipantsRaw) || [];
+        const localWatched = JSON.parse(localWatchedRaw) || {};
+        
+        // Filter out default dummy users to avoid bloating DB
+        const nonDefaultParts = localParts.filter(p => p.name !== "นายสมชาย รักษ์พลังงาน" && p.name !== "นางสาวสมหญิง ประหยัดดี");
+        if (nonDefaultParts.length === 0) {
+            localStorage.setItem("db_migrated_v1.4", "true");
+            return;
+        }
+        
+        console.log("EPAGO: Migrating " + nonDefaultParts.length + " local participants to cloud database...");
+        
+        for (const part of nonDefaultParts) {
+            const userKey = part.empId || part.name;
+            const watched = localWatched[userKey] || [];
+            
+            await fetch("/api/register", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    emptype: part.emptype || "พนักงาน",
+                    empId: part.empId || "",
+                    name: part.name,
+                    dept: part.dept,
+                    regTime: part.regTime,
+                    watched: watched
+                })
+            }).catch(e => console.error("Migration failed for: " + part.name, e));
+        }
+        
+        localStorage.setItem("db_migrated_v1.4", "true");
+        console.log("EPAGO: Cloud database migration complete!");
+    } catch (e) {
+        console.error("Migration error:", e);
     }
 }
 
@@ -1074,7 +1164,7 @@ function renderAdminParticipantsTable() {
     if (filteredParticipants.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="6" class="text-center" style="padding: 2rem; color: var(--text-secondary);">
+                <td colspan="7" class="text-center" style="padding: 2rem; color: var(--text-secondary);">
                     ไม่มีข้อมูลผู้ลงทะเบียนสำหรับสังกัดนี้
                 </td>
             </tr>
@@ -1090,6 +1180,7 @@ function renderAdminParticipantsTable() {
         const userWatched = watchedLogs[userKey] || [];
         const totalCount = videos.length;
         const watchedCount = userWatched.filter(id => videos.some(v => v.id === id)).length;
+        const blobUrl = user._blobUrl || "";
         
         const tr = document.createElement("tr");
         tr.innerHTML = `
@@ -1103,6 +1194,16 @@ function renderAdminParticipantsTable() {
                     <i data-lucide="${watchedCount === totalCount && totalCount > 0 ? 'trophy' : 'eye'}"></i>
                     <span>ชมแล้ว ${watchedCount}/${totalCount} คลิป</span>
                 </span>
+            </td>
+            <td style="text-align: center;">
+                <div class="button-group" style="justify-content: center; gap: 0.3rem;">
+                    <button class="btn btn-outline" style="padding: 0.25rem 0.45rem; font-size: 0.75rem; border-radius: 0.35rem;" onclick="openParticipantEditModal('${userKey}')" title="แก้ไขข้อมูล">
+                        <i data-lucide="edit-2" style="width: 12px; height: 12px;"></i>
+                    </button>
+                    <button class="btn btn-danger-outline" style="padding: 0.25rem 0.45rem; font-size: 0.75rem; border-radius: 0.35rem;" onclick="deleteParticipant('${userKey}', '${blobUrl}')" title="ลบข้อมูล">
+                        <i data-lucide="trash-2" style="width: 12px; height: 12px;"></i>
+                    </button>
+                </div>
             </td>
         `;
         tbody.appendChild(tr);
@@ -1370,4 +1471,238 @@ function exportParticipantsToCSV() {
     document.body.removeChild(link);
     
     showToast("ดาวน์โหลดไฟล์ CSV เรียบร้อยแล้ว 📊");
+}
+
+// --- Delete Single Participant ---
+async function deleteParticipant(userKey, blobUrl) {
+    if (confirm("คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูลผู้เข้าร่วมรายการนี้? การดำเนินการนี้ไม่สามารถย้อนกลับได้")) {
+        if (isOnlineDb) {
+            if (blobUrl) {
+                try {
+                    const response = await fetch("/api/delete-participant", {
+                        method: "DELETE",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "x-admin-password": encodeURIComponent(adminPassword)
+                        },
+                        body: JSON.stringify({ url: blobUrl })
+                    });
+                    const resData = await response.json();
+                    if (!response.ok || !resData.ok) {
+                        throw new Error(resData.error || "failed to delete");
+                    }
+                } catch (err) {
+                    console.error("Cloud delete failed:", err);
+                    showToast("ไม่สามารถลบข้อมูลบนระบบคลาวด์ได้เนื่องจากการเชื่อมต่อขัดข้อง", true);
+                    return;
+                }
+            }
+        }
+        
+        // Remove locally
+        participants = participants.filter(p => (p.empId || p.name) !== userKey);
+        delete watchedLogs[userKey];
+        
+        localStorage.setItem(DB_USERS_KEY, JSON.stringify(participants));
+        localStorage.setItem(DB_WATCHED_KEY, JSON.stringify(watchedLogs));
+        
+        if (currentUser && (currentUser.empId || currentUser.name) === userKey) {
+            localStorage.removeItem(DB_CURRENT_USER_KEY);
+            currentUser = null;
+        }
+        
+        showToast("ลบข้อมูลผู้เข้าร่วมกิจกรรมเรียบร้อยแล้ว");
+        refreshAdminDashboard();
+    }
+}
+
+// --- Edit Participant Modal Controls ---
+function openParticipantEditModal(userKey) {
+    const user = participants.find(p => (p.empId || p.name) === userKey);
+    if (!user) return;
+    
+    document.getElementById("edit-p-key").value = userKey;
+    
+    // Set Staff Type radio
+    if (user.emptype === "ลูกจ้าง") {
+        document.getElementById("edit-emptype-temp").checked = true;
+        document.getElementById("edit-empid-group").classList.add("hidden");
+        document.getElementById("edit-empid").required = false;
+        document.getElementById("edit-empid").value = "";
+    } else {
+        document.getElementById("edit-emptype-emp").checked = true;
+        document.getElementById("edit-empid-group").classList.remove("hidden");
+        document.getElementById("edit-empid").required = true;
+        document.getElementById("edit-empid").value = user.empId || "";
+    }
+    
+    document.getElementById("edit-name").value = user.name || "";
+    
+    // Populate dropdown
+    const editDeptSelect = document.getElementById("edit-dept");
+    if (editDeptSelect) {
+        let options = "";
+        UNITS.forEach(u => {
+            options += `<option value="${u}">${u}</option>`;
+        });
+        editDeptSelect.innerHTML = options;
+        
+        const isCustomDept = !UNITS.includes(user.dept);
+        const otherGroup = document.getElementById("edit-dept-other-group");
+        const otherInput = document.getElementById("edit-dept-other");
+        
+        if (isCustomDept) {
+            editDeptSelect.value = "อื่นๆ";
+            otherGroup.classList.remove("hidden");
+            otherInput.required = true;
+            otherInput.value = user.dept || "";
+        } else {
+            editDeptSelect.value = user.dept || "อื่นๆ";
+            otherGroup.classList.add("hidden");
+            otherInput.required = false;
+            otherInput.value = "";
+        }
+    }
+    
+    document.getElementById("participant-edit-modal").classList.remove("hidden");
+}
+
+function closeParticipantEditModal() {
+    document.getElementById("participant-edit-modal").classList.add("hidden");
+    document.getElementById("participant-edit-form").reset();
+}
+
+async function handleParticipantEditSave(e) {
+    e.preventDefault();
+    
+    const oldUserKey = document.getElementById("edit-p-key").value;
+    const originalUser = participants.find(p => (p.empId || p.name) === oldUserKey);
+    if (!originalUser) return;
+    
+    const emptype = document.querySelector('input[name="edit-emptype"]:checked').value;
+    let empId = "";
+    if (emptype === "พนักงาน") {
+        empId = document.getElementById("edit-empid").value.trim().toUpperCase();
+        if (!empId) {
+            showToast("กรุณากรอกรหัสพนักงาน", true);
+            return;
+        }
+    }
+    
+    const name = document.getElementById("edit-name").value.trim();
+    let dept = document.getElementById("edit-dept").value;
+    if (dept === "อื่นๆ") {
+        dept = document.getElementById("edit-dept-other").value.trim();
+    }
+    
+    if (!name || !dept) {
+        showToast("กรุณากรอกข้อมูลให้ครบถ้วน", true);
+        return;
+    }
+    
+    const updatedUser = {
+        emptype,
+        empId,
+        name,
+        dept,
+        regTime: originalUser.regTime,
+        watched: originalUser.watched || []
+    };
+    
+    const newUserKey = empId || name;
+    const keyChanged = oldUserKey !== newUserKey;
+    
+    const submitBtn = document.querySelector("#participant-edit-form button[type='submit']");
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = "กำลังบันทึก...";
+    }
+    
+    if (isOnlineDb) {
+        try {
+            if (keyChanged && originalUser._blobUrl) {
+                await fetch("/api/delete-participant", {
+                    method: "DELETE",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "x-admin-password": encodeURIComponent(adminPassword)
+                    },
+                    body: JSON.stringify({ url: originalUser._blobUrl })
+                }).catch(err => console.error("Clean old record failed:", err));
+            }
+            
+            const response = await fetch("/api/register", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(updatedUser)
+            });
+            const resData = await response.json();
+            if (response.ok && resData.ok && resData.user) {
+                const serverUser = resData.user;
+                
+                const index = participants.findIndex(p => (p.empId || p.name) === oldUserKey);
+                if (index !== -1) {
+                    participants[index] = serverUser;
+                }
+                
+                if (keyChanged) {
+                    delete watchedLogs[oldUserKey];
+                }
+                watchedLogs[newUserKey] = serverUser.watched || [];
+                
+                localStorage.setItem(DB_USERS_KEY, JSON.stringify(participants));
+                localStorage.setItem(DB_WATCHED_KEY, JSON.stringify(watchedLogs));
+                
+                if (currentUser && (currentUser.empId || currentUser.name) === oldUserKey) {
+                    currentUser = serverUser;
+                    localStorage.setItem(DB_CURRENT_USER_KEY, JSON.stringify(currentUser));
+                }
+                
+                showToast("แก้ไขข้อมูลผู้ลงทะเบียนสำเร็จ 🌱");
+                closeParticipantEditModal();
+                refreshAdminDashboard();
+            } else {
+                throw new Error(resData.error || "failed");
+            }
+        } catch (err) {
+            console.error("Cloud edit failed, falling back to local:", err);
+            showToast("การเชื่อมต่อฐานข้อมูลล้มเหลว แก้ไขข้อมูลออฟไลน์เรียบร้อยแล้ว", true);
+            localEditFallback(oldUserKey, newUserKey, keyChanged, updatedUser);
+        } finally {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = "บันทึกการแก้ไข";
+            }
+        }
+    } else {
+        localEditFallback(oldUserKey, newUserKey, keyChanged, updatedUser);
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = "บันทึกการแก้ไข";
+        }
+    }
+}
+
+function localEditFallback(oldUserKey, newUserKey, keyChanged, updatedUser) {
+    const index = participants.findIndex(p => (p.empId || p.name) === oldUserKey);
+    if (index !== -1) {
+        participants[index] = updatedUser;
+    }
+    
+    if (keyChanged) {
+        delete watchedLogs[oldUserKey];
+    }
+    watchedLogs[newUserKey] = updatedUser.watched || [];
+    
+    localStorage.setItem(DB_USERS_KEY, JSON.stringify(participants));
+    localStorage.setItem(DB_WATCHED_KEY, JSON.stringify(watchedLogs));
+    
+    if (currentUser && (currentUser.empId || currentUser.name) === oldUserKey) {
+        currentUser = updatedUser;
+        localStorage.setItem(DB_CURRENT_USER_KEY, JSON.stringify(currentUser));
+    }
+    
+    showToast("แก้ไขข้อมูลสำเร็จ (โหมดออฟไลน์) 🌱");
+    closeParticipantEditModal();
+    refreshAdminDashboard();
 }

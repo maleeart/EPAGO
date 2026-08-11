@@ -34,7 +34,10 @@ export default async function handler(req, res) {
       }
     });
 
-    const watchedList = existing ? (existing.watched || []) : [];
+    const bodyWatched = Array.isArray(req.body.watched) ? req.body.watched : [];
+    const watchedList = existing 
+      ? Array.from(new Set([...(existing.watched || []), ...bodyWatched]))
+      : bodyWatched;
     
     const data = {
       emptype,
