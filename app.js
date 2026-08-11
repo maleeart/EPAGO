@@ -197,6 +197,7 @@ async function checkOnlineStatus() {
         
         if (isOnlineDb) {
             await migrateLocalDataToCloud();
+            await syncVideosOnline();
             if (currentUser) {
                 syncCurrentUserWatchedProgress();
             }
@@ -229,6 +230,21 @@ async function syncCurrentUserWatchedProgress() {
         }
     } catch (e) {
         console.warn("Failed to sync current user watch progress:", e);
+    }
+}
+
+// Sync videos list from cloud Vercel Blob
+async function syncVideosOnline() {
+    if (!isOnlineDb) return;
+    try {
+        const response = await fetch("/api/videos");
+        const resData = await response.json();
+        if (response.ok && resData.ok && resData.videos) {
+            videos = resData.videos;
+            localStorage.setItem(DB_VIDEOS_KEY, JSON.stringify(videos));
+        }
+    } catch (e) {
+        console.warn("Failed to sync videos from cloud:", e);
     }
 }
 
@@ -1390,7 +1406,7 @@ function closeVideoModal() {
     document.getElementById("video-form").reset();
 }
 
-function handleVideoSave(e) {
+async function handleVideoSave(e) {
     e.preventDefault();
     
     const id = document.getElementById("video-id").value;
@@ -1420,16 +1436,60 @@ function handleVideoSave(e) {
         showToast("เพิ่มคลิปวิดีโอการเรียนรู้เข้าระบบสำเร็จ");
     }
     
+    if (isOnlineDb) {
+        try {
+            const response = await fetch("/api/save-videos", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "x-admin-password": encodeURIComponent(adminPassword)
+                },
+                body: JSON.stringify({ videos })
+            });
+            if (!response.ok) {
+                throw new Error("failed to save videos online");
+            }
+        } catch (err) {
+            console.error("Cloud video save failed:", err);
+            showToast("บันทึกข้อมูลคลิปขึ้นคลาวด์ขัดข้อง บันทึกเฉพาะเครื่องชั่วคราว", true);
+        }
+    }
+    
     localStorage.setItem(DB_VIDEOS_KEY, JSON.stringify(videos));
     closeVideoModal();
     renderAdminDashboard();
 }
 
-function deleteVideo(videoId) {
+async function deleteVideo(videoId) {
     if (confirm("คุณแน่ใจหรือไม่ว่าต้องการลบคลิปวิดีโอนี้? การดำเนินการนี้ไม่สามารถย้อนกลับได้")) {
-        videos = videos.filter(v => v.id !== videoId);
+        const updatedVideos = videos.filter(v => v.id !== videoId);
+        
+        if (isOnlineDb) {
+            try {
+                const response = await fetch("/api/save-videos", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "x-admin-password": encodeURIComponent(adminPassword)
+                    },
+                    body: JSON.stringify({ videos: updatedVideos })
+                });
+                if (!response.ok) {
+                    throw new Error("failed to delete video online");
+                }
+                videos = updatedVideos;
+                showToast("ลบคลิปวิดีโอเรียบร้อยแล้ว");
+            } catch (err) {
+                console.error("Cloud video delete failed:", err);
+                showToast("ลบคลิปวิดีโอล้มเหลวเนื่องจากการเชื่อมต่อขัดข้อง", true);
+                return;
+            }
+        } else {
+            videos = updatedVideos;
+            showToast("ลบคลิปวิดีโอเรียบร้อยแล้ว");
+        }
+        
         localStorage.setItem(DB_VIDEOS_KEY, JSON.stringify(videos));
-        showToast("ลบคลิปวิดีโอเรียบร้อยแล้ว");
         renderAdminDashboard();
     }
 }

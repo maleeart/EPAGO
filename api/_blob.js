@@ -67,3 +67,29 @@ export async function clearAll() {
     await del(blobs.map(b => b.url));
   }
 }
+
+// --- Videos API Helpers ---
+const VIDEOS_BLOB_PATH = "epago/videos.json";
+
+export async function saveVideos(videosList) {
+  if (!process.env.BLOB_READ_WRITE_TOKEN) return;
+  return await put(VIDEOS_BLOB_PATH, JSON.stringify(videosList), {
+    access: "public",
+    addRandomSuffix: false,
+    allowOverwrite: true,
+  });
+}
+
+export async function readVideos() {
+  if (!process.env.BLOB_READ_WRITE_TOKEN) return null;
+  try {
+    const { blobs } = await list({ prefix: VIDEOS_BLOB_PATH });
+    if (!blobs || blobs.length === 0) return null;
+    const b = blobs[0];
+    const data = await fetch(`${b.url}?t=${Date.now()}`).then(r => r.json());
+    return data;
+  } catch (e) {
+    console.error("Failed to read videos from blob:", e);
+    return null;
+  }
+}
