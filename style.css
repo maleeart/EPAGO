@@ -1282,3 +1282,13 @@ body.admin-mode .hero-banner {
         grid-template-columns: 1fr;
     }
 }
+
+/* Views display switcher states */
+.view-section {
+    display: none;
+    animation: fadeIn var(--transition-normal);
+}
+
+.view-section.active {
+    display: block;
+}
