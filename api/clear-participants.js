@@ -1,0 +1,15 @@
+import { clearAll } from "./_blob.js";
+import { authed } from "./_auth.js";
+
+export default async function handler(req, res) {
+  if (!authed(req, res)) return;
+  if (req.method !== "POST") return res.status(405).json({ error: "method not allowed" });
+
+  try {
+    await clearAll();
+    res.status(200).json({ ok: true });
+  } catch (e) {
+    console.error("Clear database error:", e);
+    res.status(500).json({ error: e.message || "server error" });
+  }
+}

@@ -57,6 +57,8 @@ let watchedLogs = {};
 let currentUser = null;
 let currentPlayingVideo = null;
 let playSimInterval = null;
+let isOnlineDb = false;
+let adminPassword = "";
 
 const UNITS = ["สก.ชธธ.","อบค.","อบฟ.","อบย.","อรอ.","อคม.","อหข.","อื่นๆ"];
 
@@ -65,6 +67,7 @@ document.addEventListener("DOMContentLoaded", () => {
     initDatabase();
     checkSession();
     renderUserLobby();
+    checkOnlineStatus();
     
     // Render units radio buttons
     const unitsWrapper = document.getElementById("units-wrapper");
@@ -121,6 +124,52 @@ document.addEventListener("DOMContentLoaded", () => {
         if (e.target.id === "admin-login-modal") closeAdminLogin();
     });
 });
+
+// Check if the server API endpoints are available
+async function checkOnlineStatus() {
+    if (window.location.protocol === "file:") {
+        isOnlineDb = false;
+        console.log("EPAGO: Local file:// mode. Using LocalStorage database fallback.");
+        return;
+    }
+    try {
+        const res = await fetch("/api/login", { method: "HEAD" }).catch(() => null);
+        isOnlineDb = res !== null && res.status !== 404;
+        console.log("EPAGO: Database connection status: " + (isOnlineDb ? "ONLINE (Vercel Cloud)" : "OFFLINE (LocalStorage Fallback)"));
+        
+        if (isOnlineDb && currentUser) {
+            syncCurrentUserWatchedProgress();
+        }
+    } catch (e) {
+        isOnlineDb = false;
+        console.log("EPAGO: Database check failed. Fallback to LocalStorage.");
+    }
+}
+
+// Sync current user watched videos from cloud
+async function syncCurrentUserWatchedProgress() {
+    if (!currentUser || !isOnlineDb) return;
+    try {
+        const response = await fetch("/api/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                emptype: currentUser.emptype,
+                name: currentUser.name,
+                empId: currentUser.empId
+            })
+        });
+        const resData = await response.json();
+        if (response.ok && resData.ok && resData.user) {
+            const userKey = currentUser.empId || currentUser.name;
+            watchedLogs[userKey] = resData.user.watched || [];
+            localStorage.setItem(DB_WATCHED_KEY, JSON.stringify(watchedLogs));
+            renderUserLobby();
+        }
+    } catch (e) {
+        console.warn("Failed to sync current user watch progress:", e);
+    }
+}
 
 // Seed data storage if empty
 function initDatabase() {
@@ -204,7 +253,7 @@ function switchView(viewName) {
         if (homeBtn) homeBtn.classList.add("hidden");
         if (logoutBtn) logoutBtn.classList.add("hidden");
         
-        renderAdminDashboard();
+        refreshAdminDashboard();
     }
     
     // Scroll to top
@@ -236,8 +285,27 @@ function showToast(message, isError = false) {
     }, 3000);
 }
 
+// Helper for local registration fallback when offline or APIs are missing
+function localRegistrationFallback(newParticipant, existingIndex) {
+    if (existingIndex === -1) {
+        participants.push(newParticipant);
+    } else {
+        participants[existingIndex] = newParticipant;
+    }
+    localStorage.setItem(DB_USERS_KEY, JSON.stringify(participants));
+    
+    const userKey = newParticipant.empId || newParticipant.name;
+    if (!watchedLogs[userKey]) {
+        watchedLogs[userKey] = [];
+        localStorage.setItem(DB_WATCHED_KEY, JSON.stringify(watchedLogs));
+    }
+    
+    currentUser = newParticipant;
+    localStorage.setItem(DB_CURRENT_USER_KEY, JSON.stringify(currentUser));
+}
+
 // --- User Registration ---
-function handleRegistration(e) {
+async function handleRegistration(e) {
     e.preventDefault();
     
     const emptypeEl = document.querySelector('input[name="emptype"]:checked');
@@ -287,31 +355,57 @@ function handleRegistration(e) {
             return dbHasNoId && typeMatches && normalizeName(p.name) === normalizedRegName;
         }
     });
+
+    const submitBtn = document.querySelector("#register-form button[type='submit']");
     
-    if (existingIndex === -1) {
-        // Add new participant
-        participants.push(newParticipant);
-        localStorage.setItem(DB_USERS_KEY, JSON.stringify(participants));
+    if (isOnlineDb) {
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = "กำลังลงทะเบียน...";
+        }
+        try {
+            const response = await fetch("/api/register", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(newParticipant)
+            });
+            const resData = await response.json();
+            if (response.ok && resData.ok && resData.user) {
+                const serverUser = resData.user;
+                
+                if (existingIndex === -1) {
+                    participants.push(serverUser);
+                } else {
+                    participants[existingIndex] = serverUser;
+                }
+                localStorage.setItem(DB_USERS_KEY, JSON.stringify(participants));
+                
+                const userKey = empId || name;
+                watchedLogs[userKey] = serverUser.watched || [];
+                localStorage.setItem(DB_WATCHED_KEY, JSON.stringify(watchedLogs));
+                
+                currentUser = serverUser;
+                localStorage.setItem(DB_CURRENT_USER_KEY, JSON.stringify(currentUser));
+                
+                showToast("ลงทะเบียนและเข้าชมสื่อออนไลน์สำเร็จ 🌱");
+            } else {
+                throw new Error(resData.error || "failed");
+            }
+        } catch (err) {
+            console.error("Cloud registration failed, falling back to local:", err);
+            showToast("การเชื่อมต่อระบบล้มเหลว บันทึกข้อมูลแบบออฟไลน์ชั่วคราว", true);
+            localRegistrationFallback(newParticipant, existingIndex);
+        } finally {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = "ลงทะเบียน";
+            }
+        }
     } else {
-        // Update existing participant details
-        participants[existingIndex] = newParticipant;
-        localStorage.setItem(DB_USERS_KEY, JSON.stringify(participants));
+        localRegistrationFallback(newParticipant, existingIndex);
+        showToast("ลงทะเบียนเสร็จสิ้น (โหมดออฟไลน์) 🌱");
     }
     
-    // Unique log key is empId if exists, otherwise their Name
-    const userKey = empId || name;
-    
-    // Initialize empty watched logs for this user if not exist
-    if (!watchedLogs[userKey]) {
-        watchedLogs[userKey] = [];
-        localStorage.setItem(DB_WATCHED_KEY, JSON.stringify(watchedLogs));
-    }
-    
-    // Set Current Session
-    currentUser = newParticipant;
-    localStorage.setItem(DB_CURRENT_USER_KEY, JSON.stringify(currentUser));
-    
-    showToast("ลงทะเบียนและเข้าชมสื่อได้สำเร็จ 🌱");
     checkSession();
     
     // Reset register form
@@ -361,8 +455,41 @@ function switchRegisterMode(mode) {
     }
 }
 
+// Helper for local returning user login fallback
+function localReturningLoginFallback(emptype, name, empId, normalizedInputName) {
+    const user = participants.find(p => {
+        const nameMatches = normalizeName(p.name) === normalizedInputName;
+        if (!nameMatches) return false;
+        
+        if (emptype === "พนักงาน") {
+            return p.empId && p.empId.toUpperCase() === empId.toUpperCase();
+        } else {
+            const dbHasNoId = !p.empId || p.empId === "";
+            const typeMatches = !p.emptype || p.emptype === "ลูกจ้าง";
+            return dbHasNoId && typeMatches;
+        }
+    });
+    
+    if (user) {
+        currentUser = user;
+        localStorage.setItem(DB_CURRENT_USER_KEY, JSON.stringify(currentUser));
+        showToast(`ยินดีต้อนรับกลับมาครับ คุณ${user.name} 🌱`);
+        checkSession();
+        
+        document.getElementById("returning-user-form").reset();
+        const retEmpidGroup = document.getElementById("ret-empid-group");
+        const retEmpidInput = document.getElementById("ret-empid");
+        if (retEmpidGroup && retEmpidInput) {
+            retEmpidGroup.classList.remove("hidden");
+            retEmpidInput.required = true;
+        }
+    } else {
+        showToast("ไม่พบข้อมูลลงทะเบียนในระบบ กรุณาตรวจสอบหรือลงทะเบียนใหม่", true);
+    }
+}
+
 // Handle Returning User quick login by credentials
-function handleReturningLogin(e) {
+async function handleReturningLogin(e) {
     e.preventDefault();
     
     const emptypeEl = document.querySelector('input[name="ret-emptype"]:checked');
@@ -383,43 +510,71 @@ function handleReturningLogin(e) {
         }
     }
     
-    // Normalize input name for comparison
     const normalizedInputName = normalizeName(name);
-
-    // Find user in local database matching exactly (ignores Thai prefixes and double spaces)
-    // Robust backward-compatible check for cases where p.emptype is undefined/missing from older versions
-    const user = participants.find(p => {
-        // Name check (normalized)
-        const nameMatches = normalizeName(p.name) === normalizedInputName;
-        if (!nameMatches) return false;
-        
-        // ID check if employee
-        if (emptype === "พนักงาน") {
-            return p.empId && p.empId.toUpperCase() === empId.toUpperCase();
-        } else {
-            // For contractor (no empId): match if database record has no ID, and type matches (or type is missing)
-            const dbHasNoId = !p.empId || p.empId === "";
-            const typeMatches = !p.emptype || p.emptype === "ลูกจ้าง";
-            return dbHasNoId && typeMatches;
-        }
-    });
+    const submitBtn = document.querySelector("#returning-user-form button[type='submit']");
     
-    if (user) {
-        currentUser = user;
-        localStorage.setItem(DB_CURRENT_USER_KEY, JSON.stringify(currentUser));
-        showToast(`ยินดีต้อนรับกลับมาครับ คุณ${user.name} 🌱`);
-        checkSession();
-        
-        // Reset returning form
-        document.getElementById("returning-user-form").reset();
-        const retEmpidGroup = document.getElementById("ret-empid-group");
-        const retEmpidInput = document.getElementById("ret-empid");
-        if (retEmpidGroup && retEmpidInput) {
-            retEmpidGroup.classList.remove("hidden");
-            retEmpidInput.required = true;
+    if (isOnlineDb) {
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = "กำลังค้นหาข้อมูล...";
+        }
+        try {
+            const response = await fetch("/api/login", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ emptype, name, empId })
+            });
+            const resData = await response.json();
+            if (response.ok && resData.ok && resData.user) {
+                currentUser = resData.user;
+                localStorage.setItem(DB_CURRENT_USER_KEY, JSON.stringify(currentUser));
+                
+                // Sync to local representation
+                const userKey = currentUser.empId || currentUser.name;
+                watchedLogs[userKey] = currentUser.watched || [];
+                localStorage.setItem(DB_WATCHED_KEY, JSON.stringify(watchedLogs));
+                
+                // Add to local participants if missing
+                const existingIndex = participants.findIndex(p => {
+                    if (currentUser.empId) {
+                        return p.empId && p.empId.toUpperCase() === currentUser.empId.toUpperCase();
+                    } else {
+                        const dbHasNoId = !p.empId || p.empId === "";
+                        const typeMatches = !p.emptype || p.emptype === "ลูกจ้าง";
+                        return dbHasNoId && typeMatches && normalizeName(p.name) === normalizedInputName;
+                    }
+                });
+                if (existingIndex === -1) {
+                    participants.push(currentUser);
+                } else {
+                    participants[existingIndex] = currentUser;
+                }
+                localStorage.setItem(DB_USERS_KEY, JSON.stringify(participants));
+                
+                showToast(`ยินดีต้อนรับกลับมาครับ คุณ${currentUser.name} 🌱`);
+                checkSession();
+                
+                document.getElementById("returning-user-form").reset();
+                const retEmpidGroup = document.getElementById("ret-empid-group");
+                const retEmpidInput = document.getElementById("ret-empid");
+                if (retEmpidGroup && retEmpidInput) {
+                    retEmpidGroup.classList.remove("hidden");
+                    retEmpidInput.required = true;
+                }
+            } else {
+                throw new Error("not found");
+            }
+        } catch (err) {
+            console.warn("Cloud login failed, checking local database:", err);
+            localReturningLoginFallback(emptype, name, empId, normalizedInputName);
+        } finally {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = "ตรวจสอบสิทธิ์เข้าชม";
+            }
         }
     } else {
-        showToast("ไม่พบข้อมูลลงทะเบียนในระบบ กรุณาตรวจสอบหรือลงทะเบียนใหม่", true);
+        localReturningLoginFallback(emptype, name, empId, normalizedInputName);
     }
 }
 
@@ -670,7 +825,18 @@ function closeVideoPlayer() {
     currentPlayingVideo = null;
 }
 
-function markCurrentVideoWatched() {
+function localWatchFallback(userKey, videoId, isNewWatch) {
+    if (isNewWatch) {
+        watchedLogs[userKey].push(videoId);
+        localStorage.setItem(DB_WATCHED_KEY, JSON.stringify(watchedLogs));
+        showToast("บันทึกการรับชมวิดีโอนี้เรียบร้อยแล้ว!");
+    } else {
+        showToast("คุณเคยบันทึกการรับชมวิดีโอนี้แล้ว");
+    }
+}
+
+// --- Video Progress Tracker ---
+async function markCurrentVideoWatched() {
     if (!currentUser || !currentPlayingVideo) return;
     
     const userKey = currentUser.empId || currentUser.name;
@@ -680,12 +846,43 @@ function markCurrentVideoWatched() {
         watchedLogs[userKey] = [];
     }
     
-    if (!watchedLogs[userKey].includes(videoId)) {
-        watchedLogs[userKey].push(videoId);
-        localStorage.setItem(DB_WATCHED_KEY, JSON.stringify(watchedLogs));
-        showToast("บันทึกการรับชมวิดีโอนี้เรียบร้อยแล้ว!");
+    const isNewWatch = !watchedLogs[userKey].includes(videoId);
+    
+    if (isOnlineDb) {
+        try {
+            const response = await fetch("/api/watched", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    emptype: currentUser.emptype,
+                    name: currentUser.name,
+                    empId: currentUser.empId,
+                    videoId: videoId
+                })
+            });
+            const resData = await response.json();
+            if (response.ok && resData.ok && resData.user) {
+                currentUser = resData.user;
+                localStorage.setItem(DB_CURRENT_USER_KEY, JSON.stringify(currentUser));
+                
+                watchedLogs[userKey] = currentUser.watched || [];
+                localStorage.setItem(DB_WATCHED_KEY, JSON.stringify(watchedLogs));
+                
+                if (isNewWatch) {
+                    showToast("บันทึกการรับชมวิดีโอนี้เรียบร้อยแล้ว! (เชื่อมต่อคลาวด์)");
+                } else {
+                    showToast("คุณเคยบันทึกการรับชมวิดีโอนี้แล้ว");
+                }
+            } else {
+                throw new Error("failed to log");
+            }
+        } catch (err) {
+            console.error("Cloud watch log failed, falling back to local:", err);
+            showToast("การบันทึกลงคลาวด์มีปัญหา บันทึกแบบออฟไลน์เรียบร้อยแล้ว", true);
+            localWatchFallback(userKey, videoId, isNewWatch);
+        }
     } else {
-        showToast("คุณเคยบันทึกการรับชมวิดีโอนี้แล้ว");
+        localWatchFallback(userKey, videoId, isNewWatch);
     }
     
     closeVideoPlayer();
@@ -709,6 +906,7 @@ function handleAdminLogin(e) {
     const pass = document.getElementById("admin-pass").value;
     
     if (pass === ADMIN_PASSWORD) {
+        adminPassword = pass;
         closeAdminLogin();
         showToast("เข้าสู่โหมดแอดมินสำเร็จ");
         switchView("admin");
@@ -719,8 +917,54 @@ function handleAdminLogin(e) {
 }
 
 function logoutAdmin() {
+    adminPassword = "";
     showToast("ออกจากโหมดผู้ดูแลระบบแล้ว");
     checkSession(); // Will return to registration or lobby depending on session
+}
+
+// Fetch participants from Vercel Blob cloud database
+async function fetchOnlineParticipants() {
+    if (!isOnlineDb) return;
+    try {
+        const response = await fetch("/api/participants", {
+            method: "GET",
+            headers: {
+                "x-admin-password": encodeURIComponent(adminPassword)
+            }
+        });
+        const resData = await response.json();
+        if (response.ok && resData.ok) {
+            participants = resData.participants || [];
+            
+            // Recompile local watchedLogs mapping
+            watchedLogs = {};
+            participants.forEach(p => {
+                const userKey = p.empId || p.name;
+                watchedLogs[userKey] = p.watched || [];
+            });
+            
+            // Backup/Cache in localStorage
+            localStorage.setItem(DB_USERS_KEY, JSON.stringify(participants));
+            localStorage.setItem(DB_WATCHED_KEY, JSON.stringify(watchedLogs));
+        } else {
+            console.error("Cloud fetch failed:", resData.error);
+        }
+    } catch (e) {
+        console.error("Error fetching online participants:", e);
+    }
+}
+
+// Refresh admin dashboard wrapper with cloud loading state
+async function refreshAdminDashboard() {
+    const totalPText = document.getElementById("admin-total-participants");
+    const totalVText = document.getElementById("admin-total-views");
+    
+    if (isOnlineDb) {
+        if (totalPText) totalPText.innerText = "กำลังโหลด...";
+        if (totalVText) totalVText.innerText = "กำลังโหลด...";
+        await fetchOnlineParticipants();
+    }
+    renderAdminDashboard();
 }
 
 // --- Admin Dashboard logic ---
@@ -1058,8 +1302,27 @@ function deleteVideo(videoId) {
 }
 
 // --- Clear Participant Logs ---
-function clearAllParticipants() {
+async function clearAllParticipants() {
     if (confirm("⚠️ คำเตือน! คุณแน่ใจที่จะลบประวัติการลงทะเบียนทั้งหมดใช่หรือไม่? ข้อมูลนี้จะหายไปอย่างถาวร")) {
+        if (isOnlineDb) {
+            try {
+                const response = await fetch("/api/clear-participants", {
+                    method: "POST",
+                    headers: {
+                        "x-admin-password": encodeURIComponent(adminPassword)
+                    }
+                });
+                const resData = await response.json();
+                if (!response.ok || !resData.ok) {
+                    throw new Error(resData.error || "failed");
+                }
+            } catch (err) {
+                console.error("Cloud clear failed:", err);
+                showToast("ไม่สามารถล้างข้อมูลในคลาวด์ได้เนื่องจากการเชื่อมต่อขัดข้อง", true);
+                return;
+            }
+        }
+        
         participants = [];
         watchedLogs = {};
         localStorage.setItem(DB_USERS_KEY, JSON.stringify(participants));
