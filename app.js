@@ -19,35 +19,11 @@ const normalizeName = name => {
 const DEFAULT_VIDEOS = [
     {
         id: "vid-1",
-        category: "ไฟฟ้า",
-        title: "เทคนิคประหยัดไฟในออฟฟิศ 🔌",
-        description: "เรียนรู้วิธีตั้งค่าการประหยัดพลังงานคอมพิวเตอร์ การปิดหน้าจอช่วงพักเที่ยง และการจัดการระบบสแตนด์บายของเครื่องใช้ไฟฟ้าอย่างถูกวิธี",
+        category: "ทั่วไป",
+        title: "12 วิธีประหยัดพลังงานในที่ทำงาน 💡",
+        description: "เคล็ดลับการอนุรักษ์พลังงานในที่ทำงานและสำนักงานอย่างมีประสิทธิภาพสูงสุด 12 วิธีที่ทำตามได้จริงและเห็นผลลัพธ์ทันที",
         url: "", // Leave blank for simulation
-        duration: "3:45"
-    },
-    {
-        id: "vid-2",
-        category: "ไฟฟ้า",
-        title: "ปรับอุณหภูมิแอร์ เพิ่มประสิทธิภาพการประหยัดแอร์ 🌱",
-        description: "การปรับอุณหภูมิเครื่องปรับอากาศเป็น 26 องศาเซลเซียส พร้อมเปิดพัดลมควบคู่ ช่วยลดภาระการทำงานของแอร์และประหยัดค่าไฟลงได้มากกว่า 10%",
-        url: "https://www.youtube.com/watch?v=kYJUp5WwFik", // Sample Youtube Video (clean energy / energy saving themed)
-        duration: "5:20"
-    },
-    {
-        id: "vid-3",
-        category: "น้ำ",
-        title: "หยดน้ำเล็กๆ ที่หายไป: รณรงค์การประหยัดน้ำในองค์กร 💧",
-        description: "ชี้ให้เห็นถึงความสูญเสียจากอุปกรณ์ห้องน้ำที่ชำรุด วิธีแจ้งซ่อมอย่างรวดเร็ว และการใช้น้ำอย่างคุ้มค่าในจุดล้างจานและห้องน้ำส่วนกลาง",
-        url: "",
-        duration: "2:15"
-    },
-    {
-        id: "vid-4",
-        category: "กระดาษ/ขยะ",
-        title: "ก้าวสู่ Paperless Office ด้วยกระดาษ 2 หน้า 📄",
-        description: "แนวทางการทำงานแบบดิจิทัลเพื่อลดปริมาณการพิมพ์เอกสาร และการคัดแยกเศษกระดาษเพื่อนำมารีไซเคิลอย่างสร้างสรรค์เพื่อลดการทำลายทรัพยากรป่าไม้",
-        url: "",
-        duration: "4:05"
+        duration: "3:30"
     }
 ];
 
@@ -70,8 +46,8 @@ const DEFAULT_PARTICIPANTS = [
 ];
 
 const DEFAULT_WATCHED_LOGS = {
-    "EMP001": ["vid-1", "vid-3"],
-    "นางสาวสมหญิง ประหยัดดี": ["vid-1", "vid-2", "vid-3", "vid-4"]
+    "EMP001": ["vid-1"],
+    "นางสาวสมหญิง ประหยัดดี": ["vid-1"]
 };
 
 // --- App State ---
@@ -149,7 +125,7 @@ document.addEventListener("DOMContentLoaded", () => {
 // Seed data storage if empty
 function initDatabase() {
     // Database Versioning / Force Reset for default videos
-    const DB_VERSION = "v1.3";
+    const DB_VERSION = "v1.4";
     if (localStorage.getItem("db_version") !== DB_VERSION) {
         localStorage.setItem(DB_VIDEOS_KEY, JSON.stringify(DEFAULT_VIDEOS));
         localStorage.setItem("db_version", DB_VERSION);
