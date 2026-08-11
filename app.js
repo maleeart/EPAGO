@@ -644,9 +644,20 @@ function renderAdminDashboard() {
     document.getElementById("admin-total-videos").innerText = totalVideos;
     document.getElementById("admin-total-views").innerText = totalViews;
     
+    // Populate affiliation breakdown stats dropdown
+    const statSelect = document.getElementById("admin-stat-unit-select");
+    if (statSelect && statSelect.children.length === 0) {
+        let options = `<option value="ทั้งหมด">ทั้งหมด (ทุกสังกัด)</option>`;
+        UNITS.forEach(u => {
+            options += `<option value="${u}">${u}</option>`;
+        });
+        statSelect.innerHTML = options;
+    }
+    
     // Render Tabs content
     renderAdminVideosTable();
     renderAdminParticipantsTable();
+    renderAffiliationVideoStats();
 }
 
 function renderAdminVideosTable() {
@@ -709,14 +720,15 @@ function renderAdminParticipantsTable() {
     const sortedParticipants = [...participants].sort((a,b) => b.regTime.localeCompare(a.regTime));
     
     sortedParticipants.forEach(user => {
-        const userWatched = watchedLogs[user.empId] || [];
+        const userKey = user.empId || user.name;
+        const userWatched = watchedLogs[userKey] || [];
         const totalCount = videos.length;
         const watchedCount = userWatched.filter(id => videos.some(v => v.id === id)).length;
         
         const tr = document.createElement("tr");
         tr.innerHTML = `
             <td><span class="category-pill" style="background-color: #fff8e0; border-color: rgba(253,197,0,0.25); color: var(--yellow-d);">${user.emptype || 'พนักงาน'}</span></td>
-            <td style="font-family: 'Outfit', sans-serif; font-weight: 500;">${user.empId}</td>
+            <td style="font-family: 'Outfit', sans-serif; font-weight: 500;">${user.empId || '-'}</td>
             <td><strong>${user.name}</strong></td>
             <td>${user.dept}</td>
             <td style="font-family: 'Outfit', sans-serif; font-size: 0.85rem; color: var(--text-secondary);">${user.regTime}</td>
@@ -731,6 +743,50 @@ function renderAdminParticipantsTable() {
     });
     
     lucide.createIcons();
+}
+
+function renderAffiliationVideoStats() {
+    const selectedUnit = document.getElementById("admin-stat-unit-select").value;
+    const tbody = document.getElementById("admin-stat-video-tbody");
+    if (!tbody) return;
+    
+    tbody.innerHTML = "";
+    
+    // Filter participants in this affiliation
+    const filteredUsers = participants.filter(p => selectedUnit === "ทั้งหมด" || p.dept === selectedUnit);
+    
+    if (videos.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="3" class="text-center" style="padding: 1rem; color: var(--text-secondary);">
+                    ไม่มีคลิปวิดีโอในระบบ
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    videos.forEach(video => {
+        // Count how many of these filtered participants watched this video
+        let watchedCount = 0;
+        filteredUsers.forEach(user => {
+            const userKey = user.empId || user.name;
+            const watched = watchedLogs[userKey] || [];
+            if (watched.includes(video.id)) {
+                watchedCount++;
+            }
+        });
+        
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+            <td><strong style="color: var(--blue-d);">${video.title}</strong></td>
+            <td><span class="category-pill" style="font-size: 0.75rem; padding: 0.15rem 0.4rem;">${video.category}</span></td>
+            <td style="text-align: center; font-weight: 700; font-family: 'Outfit', sans-serif; color: var(--blue);">
+                ${watchedCount} / ${filteredUsers.length} คน
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
 }
 
 // --- CRUD: Add / Edit Videos ---
