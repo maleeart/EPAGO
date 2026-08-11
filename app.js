@@ -43,7 +43,7 @@ const DEFAULT_VIDEOS = [
         category: "ทั่วไป",
         title: "12 วิธีประหยัดพลังงานในที่ทำงาน 💡",
         description: "เคล็ดลับการอนุรักษ์พลังงานในที่ทำงานและสำนักงานอย่างมีประสิทธิภาพสูงสุด 12 วิธีที่ทำตามได้จริงและเห็นผลลัพธ์ทันที",
-        url: "", // Leave blank for simulation
+        url: "https://www.youtube.com/watch?v=kYJ41S2i2s0",
         duration: "3:30"
     }
 ];
@@ -283,7 +283,7 @@ async function migrateLocalDataToCloud() {
 // Seed data storage if empty
 function initDatabase() {
     // Database Versioning / Force Reset for default videos
-    const DB_VERSION = "v1.4";
+    const DB_VERSION = "v1.5";
     if (localStorage.getItem("db_version") !== DB_VERSION) {
         localStorage.setItem(DB_VIDEOS_KEY, JSON.stringify(DEFAULT_VIDEOS));
         localStorage.setItem("db_version", DB_VERSION);

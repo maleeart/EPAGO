@@ -5,7 +5,7 @@
     <script>
         // Force database reset on version mismatch (inline to ensure it runs immediately)
         (function() {
-            var CURRENT_VERSION = "v1.4";
+            var CURRENT_VERSION = "v1.5";
             if (localStorage.getItem("db_version") !== CURRENT_VERSION) {
                 localStorage.removeItem("energysave_videos");
                 localStorage.setItem("db_version", CURRENT_VERSION);
