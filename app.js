@@ -54,7 +54,7 @@ const DEFAULT_PARTICIPANTS = [
     },
     {
         emptype: "ลูกจ้าง",
-        empId: "EMP002",
+        empId: "",
         name: "นางสาวสมหญิง ประหยัดดี",
         dept: "ฝ่ายการเงินและบัญชี",
         regTime: "2026-08-11 09:15"
@@ -63,7 +63,7 @@ const DEFAULT_PARTICIPANTS = [
 
 const DEFAULT_WATCHED_LOGS = {
     "EMP001": ["vid-1", "vid-3"],
-    "EMP002": ["vid-1", "vid-2", "vid-3", "vid-4"]
+    "นางสาวสมหญิง ประหยัดดี": ["vid-1", "vid-2", "vid-3", "vid-4"]
 };
 
 // --- App State ---
@@ -99,6 +99,22 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
     }
+
+    // Toggle Employee ID field based on Staff Type
+    const empTypeRadios = document.querySelectorAll('input[name="emptype"]');
+    empTypeRadios.forEach(radio => {
+        radio.addEventListener("change", (e) => {
+            const isEmp = e.target.value === "พนักงาน";
+            const empidGroup = document.getElementById("empid-group");
+            const empidInput = document.getElementById("reg-empid");
+            
+            if (empidGroup && empidInput) {
+                empidGroup.classList.toggle("hidden", !isEmp);
+                empidInput.required = isEmp;
+                if (!isEmp) empidInput.value = "";
+            }
+        });
+    });
 
     // Admin login overlay backdrop click close
     document.getElementById("admin-login-modal").addEventListener("click", (e) => {
@@ -211,7 +227,16 @@ function handleRegistration(e) {
     
     const emptypeEl = document.querySelector('input[name="emptype"]:checked');
     const name = document.getElementById("reg-name").value.trim();
-    const empId = document.getElementById("reg-empid").value.trim().toUpperCase();
+    
+    const emptype = emptypeEl ? emptypeEl.value : "";
+    let empId = "";
+    if (emptype === "พนักงาน") {
+        empId = document.getElementById("reg-empid").value.trim().toUpperCase();
+        if (!empId) {
+            showToast("กรุณากรอกรหัสพนักงาน", true);
+            return;
+        }
+    }
     
     const unitEl = document.querySelector('input[name="unit"]:checked');
     let dept = unitEl ? unitEl.value : "";
@@ -219,12 +244,10 @@ function handleRegistration(e) {
         dept = document.getElementById("reg-dept-other").value.trim();
     }
     
-    if (!emptypeEl || !name || !empId || !dept) {
-        showToast("กรุณากรอกข้อมูลให้ครบถ้วนทุกช่อง", true);
+    if (!emptype || !name || !dept) {
+        showToast("กรุณากรอกข้อมูลให้ครบถ้วน", true);
         return;
     }
-    
-    const emptype = emptypeEl.value;
     
     // Format current date and time
     const now = new Date();
@@ -239,7 +262,10 @@ function handleRegistration(e) {
     };
     
     // Check if participant already exists in logs
-    const existingIndex = participants.findIndex(p => p.empId === empId);
+    const existingIndex = participants.findIndex(p => 
+        (empId && p.empId === empId) || (!empId && p.name === name && p.emptype === "ลูกจ้าง")
+    );
+    
     if (existingIndex === -1) {
         // Add new participant
         participants.push(newParticipant);
@@ -250,9 +276,12 @@ function handleRegistration(e) {
         localStorage.setItem(DB_USERS_KEY, JSON.stringify(participants));
     }
     
+    // Unique log key is empId if exists, otherwise their Name
+    const userKey = empId || name;
+    
     // Initialize empty watched logs for this user if not exist
-    if (!watchedLogs[empId]) {
-        watchedLogs[empId] = [];
+    if (!watchedLogs[userKey]) {
+        watchedLogs[userKey] = [];
         localStorage.setItem(DB_WATCHED_KEY, JSON.stringify(watchedLogs));
     }
     
@@ -268,10 +297,18 @@ function handleRegistration(e) {
     
     // Reset register form
     document.getElementById("register-form").reset();
+    
+    // Reset inputs visibility
     const otherInput = document.getElementById("reg-dept-other");
     if (otherInput) {
         otherInput.classList.add("hidden");
         otherInput.required = false;
+    }
+    const empidGroup = document.getElementById("empid-group");
+    const empidInput = document.getElementById("reg-empid");
+    if (empidGroup && empidInput) {
+        empidGroup.classList.remove("hidden");
+        empidInput.required = true;
     }
 }
 
@@ -279,7 +316,8 @@ function handleRegistration(e) {
 function renderUserLobby() {
     if (!currentUser) return;
     
-    const userWatched = watchedLogs[currentUser.empId] || [];
+    const userKey = currentUser.empId || currentUser.name;
+    const userWatched = watchedLogs[userKey] || [];
     const totalVideos = videos.length;
     const watchedCount = userWatched.filter(id => videos.some(v => v.id === id)).length;
     
@@ -524,15 +562,15 @@ function closeVideoPlayer() {
 function markCurrentVideoWatched() {
     if (!currentUser || !currentPlayingVideo) return;
     
-    const empId = currentUser.empId;
+    const userKey = currentUser.empId || currentUser.name;
     const videoId = currentPlayingVideo.id;
     
-    if (!watchedLogs[empId]) {
-        watchedLogs[empId] = [];
+    if (!watchedLogs[userKey]) {
+        watchedLogs[userKey] = [];
     }
     
-    if (!watchedLogs[empId].includes(videoId)) {
-        watchedLogs[empId].push(videoId);
+    if (!watchedLogs[userKey].includes(videoId)) {
+        watchedLogs[userKey].push(videoId);
         localStorage.setItem(DB_WATCHED_KEY, JSON.stringify(watchedLogs));
         showToast("บันทึกการรับชมวิดีโอนี้เรียบร้อยแล้ว!");
     } else {
