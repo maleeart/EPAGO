@@ -214,12 +214,12 @@ async function syncCurrentUserWatchedProgress() {
 // Migrate local storage participants and watched logs to cloud Vercel Blob
 async function migrateLocalDataToCloud() {
     if (!isOnlineDb) return;
-    if (localStorage.getItem("db_migrated_v1.4") === "true") return;
+    if (localStorage.getItem("db_migrated_v1.4_v2") === "true") return;
     
     const localParticipantsRaw = localStorage.getItem(DB_USERS_KEY);
     const localWatchedRaw = localStorage.getItem(DB_WATCHED_KEY);
     if (!localParticipantsRaw) {
-        localStorage.setItem("db_migrated_v1.4", "true");
+        localStorage.setItem("db_migrated_v1.4_v2", "true");
         return;
     }
     
@@ -227,16 +227,14 @@ async function migrateLocalDataToCloud() {
         const localParts = JSON.parse(localParticipantsRaw) || [];
         const localWatched = JSON.parse(localWatchedRaw) || {};
         
-        // Filter out default dummy users to avoid bloating DB
-        const nonDefaultParts = localParts.filter(p => p.name !== "นายสมชาย รักษ์พลังงาน" && p.name !== "นางสาวสมหญิง ประหยัดดี");
-        if (nonDefaultParts.length === 0) {
-            localStorage.setItem("db_migrated_v1.4", "true");
+        if (localParts.length === 0) {
+            localStorage.setItem("db_migrated_v1.4_v2", "true");
             return;
         }
         
-        console.log("EPAGO: Migrating " + nonDefaultParts.length + " local participants to cloud database...");
+        console.log("EPAGO: Migrating " + localParts.length + " local participants to cloud database...");
         
-        for (const part of nonDefaultParts) {
+        for (const part of localParts) {
             const userKey = part.empId || part.name;
             const watched = localWatched[userKey] || [];
             
@@ -254,7 +252,7 @@ async function migrateLocalDataToCloud() {
             }).catch(e => console.error("Migration failed for: " + part.name, e));
         }
         
-        localStorage.setItem("db_migrated_v1.4", "true");
+        localStorage.setItem("db_migrated_v1.4_v2", "true");
         console.log("EPAGO: Cloud database migration complete!");
     } catch (e) {
         console.error("Migration error:", e);
