@@ -587,15 +587,12 @@ function switchRegisterMode(mode) {
 // Helper for local returning user login fallback
 function localReturningLoginFallback(emptype, name, empId, normalizedInputName) {
     const user = participants.find(p => {
-        const nameMatches = normalizeName(p.name) === normalizedInputName;
-        if (!nameMatches) return false;
-        
         if (emptype === "พนักงาน") {
             return p.empId && p.empId.toUpperCase() === empId.toUpperCase();
         } else {
             const dbHasNoId = !p.empId || p.empId === "";
             const typeMatches = !p.emptype || p.emptype === "ลูกจ้าง";
-            return dbHasNoId && typeMatches;
+            return dbHasNoId && typeMatches && normalizeName(p.name) === normalizedInputName;
         }
     });
     
@@ -967,6 +964,32 @@ function localWatchFallback(userKey, videoId, isNewWatch) {
     if (isNewWatch) {
         watchedLogs[userKey].push(videoId);
         localStorage.setItem(DB_WATCHED_KEY, JSON.stringify(watchedLogs));
+        
+        // Sync to local participants state
+        if (currentUser) {
+            const pIndex = participants.findIndex(p => {
+                if (currentUser.empId) {
+                    return p.empId && p.empId.toUpperCase() === currentUser.empId.toUpperCase();
+                } else {
+                    return (!p.empId || p.empId === "") && normalizeName(p.name) === normalizeName(currentUser.name);
+                }
+            });
+            if (pIndex !== -1) {
+                if (!participants[pIndex].watched) participants[pIndex].watched = [];
+                if (!participants[pIndex].watched.includes(videoId)) {
+                    participants[pIndex].watched.push(videoId);
+                }
+                localStorage.setItem(DB_USERS_KEY, JSON.stringify(participants));
+            }
+            
+            // Also update currentUser object representation
+            if (!currentUser.watched) currentUser.watched = [];
+            if (!currentUser.watched.includes(videoId)) {
+                currentUser.watched.push(videoId);
+            }
+            localStorage.setItem(DB_CURRENT_USER_KEY, JSON.stringify(currentUser));
+        }
+        
         showToast("บันทึกการรับชมวิดีโอนี้เรียบร้อยแล้ว!");
     } else {
         showToast("คุณเคยบันทึกการรับชมวิดีโอนี้แล้ว");
@@ -1005,6 +1028,19 @@ async function markCurrentVideoWatched() {
                 
                 watchedLogs[userKey] = currentUser.watched || [];
                 localStorage.setItem(DB_WATCHED_KEY, JSON.stringify(watchedLogs));
+                
+                // Sync to local participants state
+                const pIndex = participants.findIndex(p => {
+                    if (currentUser.empId) {
+                        return p.empId && p.empId.toUpperCase() === currentUser.empId.toUpperCase();
+                    } else {
+                        return (!p.empId || p.empId === "") && normalizeName(p.name) === normalizeName(currentUser.name);
+                    }
+                });
+                if (pIndex !== -1) {
+                    participants[pIndex].watched = currentUser.watched || [];
+                    localStorage.setItem(DB_USERS_KEY, JSON.stringify(participants));
+                }
                 
                 if (isNewWatch) {
                     showToast("บันทึกการรับชมวิดีโอนี้เรียบร้อยแล้ว! (เชื่อมต่อคลาวด์)");

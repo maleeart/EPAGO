@@ -26,15 +26,12 @@ export default async function handler(req, res) {
     const normalizedInputName = normalizeName(name);
     
     const user = participants.find(p => {
-      const nameMatches = normalizeName(p.name) === normalizedInputName;
-      if (!nameMatches) return false;
-      
       if (emptype === "พนักงาน") {
         return p.empId && p.empId.toUpperCase() === empId.toUpperCase();
       } else {
         const dbHasNoId = !p.empId || p.empId === "";
         const typeMatches = !p.emptype || p.emptype === "ลูกจ้าง";
-        return dbHasNoId && typeMatches;
+        return dbHasNoId && typeMatches && normalizeName(p.name) === normalizedInputName;
       }
     });
 
