@@ -334,6 +334,29 @@
                     </div>
                 </div>
 
+                <!-- Registration Summary by Affiliation Card -->
+                <div class="card" style="margin-bottom: 1.5rem; background-color: #ffffff; border-color: rgba(27,76,158,0.15); padding: 1.25rem;">
+                    <h4 style="color: var(--blue-d); margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.4rem; font-size: 1.1rem;">
+                        <i data-lucide="pie-chart" style="width: 1.2rem; height: 1.2rem; color: var(--blue);"></i> 
+                        สรุปยอดผู้ลงทะเบียนรับชมสื่อแยกตามสังกัด (ฝ่าย)
+                    </h4>
+                    <div class="table-responsive">
+                        <table class="admin-table" style="font-size: 0.85rem;">
+                            <thead>
+                                <tr style="background-color: var(--blue-d);">
+                                    <th style="padding: 0.6rem 0.8rem; font-size: 0.8rem; white-space: nowrap;">สังกัด / ฝ่าย</th>
+                                    <th style="text-align: center; padding: 0.6rem 0.8rem; font-size: 0.8rem; white-space: nowrap;">ลงทะเบียนทั้งหมด</th>
+                                    <th style="text-align: center; padding: 0.6rem 0.8rem; font-size: 0.8rem; color: #10b981; white-space: nowrap;">ชมครบทุกคลิปแล้ว</th>
+                                    <th style="text-align: center; padding: 0.6rem 0.8rem; font-size: 0.8rem; color: var(--yellow-d); white-space: nowrap;">กำลังรับชม / ชมบางส่วน</th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-summary-dept-tbody">
+                                <!-- Populated dynamically by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
                 <!-- Affiliation & Video Statistics Card -->
                 <div class="card" style="margin-bottom: 1.5rem; background-color: #f7fafd; border-color: rgba(27,76,158,0.15); padding: 1.25rem;">
                     <h4 style="color: var(--blue-d); margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.4rem; font-size: 1.1rem;">

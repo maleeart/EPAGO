@@ -1263,6 +1263,84 @@ function renderAdminDashboard() {
     renderAdminVideosTable();
     renderAdminParticipantsTable();
     renderAffiliationVideoStats();
+    renderAffiliationRegistrationSummary();
+}
+
+function renderAffiliationRegistrationSummary() {
+    const tbody = document.getElementById("admin-summary-dept-tbody");
+    if (!tbody) return;
+    
+    tbody.innerHTML = "";
+    
+    // Initialize statistics map for each unit
+    const stats = {};
+    UNITS.forEach(u => {
+        stats[u] = { total: 0, completed: 0, inProgress: 0 };
+    });
+    
+    // Total count of videos in system
+    const totalVideosCount = videos.length;
+    
+    // Process each participant
+    participants.forEach(user => {
+        const userKey = user.empId || user.name;
+        const userWatched = watchedLogs[userKey] || [];
+        const watchedCount = userWatched.filter(id => videos.some(v => v.id === id)).length;
+        
+        const isCompleted = (totalVideosCount > 0 && watchedCount === totalVideosCount);
+        
+        // Find which department key to attribute to
+        let deptKey = "อื่นๆ";
+        if (user.dept && UNITS.includes(user.dept) && user.dept !== "อื่นๆ") {
+            deptKey = user.dept;
+        }
+        
+        if (!stats[deptKey]) {
+            stats[deptKey] = { total: 0, completed: 0, inProgress: 0 };
+        }
+        
+        stats[deptKey].total++;
+        if (isCompleted) {
+            stats[deptKey].completed++;
+        } else {
+            stats[deptKey].inProgress++;
+        }
+    });
+    
+    // Render rows for each unit
+    UNITS.forEach(u => {
+        const data = stats[u] || { total: 0, completed: 0, inProgress: 0 };
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+            <td><strong>${u}</strong></td>
+            <td style="text-align: center; font-weight: 600; font-family: 'Outfit', sans-serif;">${data.total}</td>
+            <td style="text-align: center; color: #10b981; font-weight: 600; font-family: 'Outfit', sans-serif;">${data.completed}</td>
+            <td style="text-align: center; color: var(--yellow-d); font-weight: 600; font-family: 'Outfit', sans-serif;">${data.inProgress}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+    
+    // Calculate Grand Total
+    let grandTotal = 0;
+    let grandCompleted = 0;
+    let grandInProgress = 0;
+    Object.values(stats).forEach(data => {
+        grandTotal += data.total;
+        grandCompleted += data.completed;
+        grandInProgress += data.inProgress;
+    });
+    
+    // Render Grand Total Row
+    const trTotal = document.createElement("tr");
+    trTotal.style.backgroundColor = "#eef3fa";
+    trTotal.style.borderTop = "2px solid var(--blue)";
+    trTotal.innerHTML = `
+        <td><strong style="color: var(--blue-d);">รวมทุกฝ่าย / สังกัดทั้งหมด</strong></td>
+        <td style="text-align: center; font-weight: 800; font-family: 'Outfit', sans-serif; font-size: 1.05rem; color: var(--blue-d);">${grandTotal}</td>
+        <td style="text-align: center; font-weight: 800; font-family: 'Outfit', sans-serif; font-size: 1.05rem; color: #10b981;">${grandCompleted}</td>
+        <td style="text-align: center; font-weight: 800; font-family: 'Outfit', sans-serif; font-size: 1.05rem; color: var(--yellow-d);">${grandInProgress}</td>
+    `;
+    tbody.appendChild(trTotal);
 }
 
 function renderAdminVideosTable() {
