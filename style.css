@@ -32,7 +32,7 @@
     --success-glow: rgba(16, 185, 129, 0.15);
     
     /* Typography */
-    --font-family: "Sarabun", "Noto Sans Thai", "Segoe UI", Tahoma, sans-serif;
+    --font-family: "Outfit", "Noto Sans Thai", "Sarabun", sans-serif;
     
     /* Transitions */
     --transition-fast: 0.18s ease;
@@ -72,9 +72,9 @@ body {
 }
 
 .header-container {
-    max-width: 1000px;
+    max-width: 820px;
     margin: 0 auto;
-    padding: 0.8rem 1.2rem;
+    padding: 0.8rem 14px;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -219,9 +219,9 @@ body {
 
 /* Main Container */
 .main-container {
-    max-width: 860px;
+    max-width: 820px;
     margin: 0 auto;
-    padding: 1.5rem 1rem 4rem 1rem;
+    padding: 36px 14px 72px;
 }
 
 /* EGAT Hero Banner */
@@ -1311,4 +1311,19 @@ body.admin-mode .hero-banner {
 
 .desc-toggle-btn:hover {
     color: var(--yellow-d) !important;
+}
+
+@media (max-width: 580px) {
+    .logo-text {
+        font-size: 1.15rem;
+    }
+    .nav-btn span {
+        display: none;
+    }
+    .nav-btn {
+        padding: 0.4rem 0.5rem;
+    }
+    .header-container {
+        padding: 0.6rem 10px;
+    }
 }
