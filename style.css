@@ -95,14 +95,17 @@ body {
 }
 
 .logo-text {
-    font-size: 1.35rem;
-    font-weight: 700;
+    font-size: 1.45rem;
+    font-weight: 800;
     letter-spacing: -0.02em;
     color: var(--blue);
 }
 
 .logo-accent {
-    color: var(--yellow-d);
+    background: linear-gradient(135deg, var(--yellow-d) 0%, var(--yellow) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    display: inline-block;
 }
 
 .nav-actions {
