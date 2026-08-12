@@ -1305,3 +1305,7 @@ body.admin-mode .hero-banner {
     color: var(--blue) !important;
     background-color: rgba(27,76,158,0.05);
 }
+
+.desc-toggle-btn:hover {
+    color: var(--yellow-d) !important;
+}

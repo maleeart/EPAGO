@@ -1282,14 +1282,31 @@ function renderAdminVideosTable() {
     
     videos.forEach((video) => {
         const tr = document.createElement("tr");
+        
+        // Description toggler logic
+        const descText = video.description || "-";
+        let descHtml = "";
+        if (descText.length > 80) {
+            const shortDesc = descText.slice(0, 80);
+            descHtml = `
+                <div class="desc-container" style="font-size: 0.85rem; color: var(--text-secondary);">
+                    <span class="desc-short">${shortDesc}...</span>
+                    <span class="desc-full hidden">${descText}</span>
+                    <button type="button" class="desc-toggle-btn" onclick="toggleDescription(this)" style="background: none; border: none; color: var(--blue); padding: 0; margin-left: 5px; font-size: 0.8rem; font-weight: 600; cursor: pointer; text-decoration: underline; display: inline-block;">ดูเพิ่มเติม</button>
+                </div>
+            `;
+        } else {
+            descHtml = `<span style="font-size: 0.85rem; color: var(--text-secondary);">${descText}</span>`;
+        }
+        
         tr.innerHTML = `
-            <td style="white-space: nowrap;"><span class="category-pill">${video.category}</span></td>
-            <td><strong style="color: var(--text-primary);">${video.title}</strong></td>
-            <td><span style="font-size: 0.85rem; color: var(--text-secondary); display: block; max-height: 40px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 320px;">${video.description}</span></td>
-            <td style="white-space: nowrap;">
-                ${video.url ? `<a href="${video.url}" target="_blank" style="color: var(--primary); text-decoration: none; display: flex; align-items: center; gap: 0.2rem; white-space: nowrap;"><i data-lucide="external-link" style="width: 12px; height: 12px;"></i> ดูลิงก์จริง</a>` : `<span style="color: var(--text-secondary); font-style: italic; white-space: nowrap;">ระบบเล่นจำลอง</span>`}
+            <td style="white-space: nowrap; vertical-align: top;"><span class="category-pill">${video.category}</span></td>
+            <td style="vertical-align: top; min-width: 150px; max-width: 250px; word-wrap: break-word;"><strong style="color: var(--text-primary); font-size: 0.95rem; font-weight: 600; display: block; line-height: 1.4;">${video.title}</strong></td>
+            <td style="vertical-align: top; min-width: 220px; max-width: 380px; word-wrap: break-word; line-height: 1.5;">${descHtml}</td>
+            <td style="white-space: nowrap; vertical-align: top;">
+                ${video.url ? `<a href="${video.url}" target="_blank" style="color: var(--primary); text-decoration: none; display: inline-flex; align-items: center; gap: 0.2rem; font-size: 0.85rem; font-weight: 500;"><i data-lucide="external-link" style="width: 13px; height: 13px;"></i> ดูลิงก์จริง</a>` : `<span style="color: var(--text-secondary); font-style: italic; font-size: 0.85rem;">ระบบเล่นจำลอง</span>`}
             </td>
-            <td style="text-align: center; white-space: nowrap;">
+            <td style="text-align: center; white-space: nowrap; vertical-align: top;">
                 <div class="button-group" style="justify-content: center; flex-wrap: nowrap; display: inline-flex; gap: 0.3rem;">
                     <button class="btn btn-outline" style="padding: 0.35rem 0.6rem; font-size: 0.8rem; border-radius: 0.4rem; white-space: nowrap;" onclick="openVideoModal('${video.id}')">
                         <i data-lucide="edit" style="width: 12px; height: 12px;"></i> แก้ไข
@@ -1304,6 +1321,22 @@ function renderAdminVideosTable() {
     });
     
     lucide.createIcons();
+}
+
+function toggleDescription(btn) {
+    const container = btn.parentElement;
+    const shortSpan = container.querySelector(".desc-short");
+    const fullSpan = container.querySelector(".desc-full");
+    
+    if (fullSpan.classList.contains("hidden")) {
+        fullSpan.classList.remove("hidden");
+        shortSpan.classList.add("hidden");
+        btn.innerText = "ย่อข้อความ";
+    } else {
+        fullSpan.classList.add("hidden");
+        shortSpan.classList.remove("hidden");
+        btn.innerText = "ดูเพิ่มเติม";
+    }
 }
 
 function renderAdminParticipantsTable() {
