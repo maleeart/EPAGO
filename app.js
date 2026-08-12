@@ -816,6 +816,9 @@ function renderUserLobby() {
     
     videos.forEach(video => {
         const isWatched = userWatched.includes(video.id);
+        const ytId = video.url ? getYoutubeId(video.url) : null;
+        const thumbnailUrl = ytId ? `https://img.youtube.com/vi/${ytId}/hqdefault.jpg` : "";
+        
         const card = document.createElement("div");
         card.className = "glass-card video-card";
         card.onclick = () => playVideo(video.id);
@@ -825,10 +828,14 @@ function renderUserLobby() {
                 <span class="category-badge">${video.category}</span>
                 <span class="duration-tag"><i data-lucide="clock" style="width: 10px; height: 10px; display: inline; vertical-align: middle;"></i> ${video.duration}</span>
                 
-                <div class="thumbnail-placeholder">
-                    <i data-lucide="play-circle"></i>
-                    <span>รับชมคลิปวิดีโอ</span>
-                </div>
+                ${thumbnailUrl ? `
+                    <img src="${thumbnailUrl}" alt="${video.title}" class="video-thumbnail-img" style="width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0; border-radius: 0.75rem 0.75rem 0 0; border: none; outline: none;">
+                ` : `
+                    <div class="thumbnail-placeholder">
+                        <i data-lucide="play-circle"></i>
+                        <span>รับชมคลิปวิดีโอ</span>
+                    </div>
+                `}
                 
                 <div class="play-overlay">
                     <i data-lucide="play"></i>
