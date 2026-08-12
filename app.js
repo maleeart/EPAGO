@@ -825,6 +825,9 @@ function renderUserLobby() {
         const isWatched = userWatched.includes(video.id);
         const ytId = video.url ? getYoutubeId(video.url) : null;
         const thumbnailUrl = ytId ? `https://img.youtube.com/vi/${ytId}/hqdefault.jpg` : "";
+        const watchedTime = (currentUser.watchedAt && currentUser.watchedAt[video.id]) 
+            ? currentUser.watchedAt[video.id] 
+            : (currentUser.regTime || "-");
         
         const card = document.createElement("div");
         card.className = "glass-card video-card";
@@ -851,48 +854,26 @@ function renderUserLobby() {
             <div class="video-card-content">
                 <h4 class="video-card-title">${video.title}</h4>
                 <p class="video-card-desc">${video.description}</p>
-                <div class="video-card-footer">
-                    <div class="watched-status-pill ${isWatched ? 'watched' : ''}">
-                        <i data-lucide="${isWatched ? 'check-circle' : 'circle'}"></i>
-                        <span>${isWatched ? 'รับชมแล้ว' : 'ยังไม่ได้ชม'}</span>
+                <div class="video-card-footer" style="display: flex; flex-direction: column; align-items: flex-start; gap: 0.4rem; border-top: 1px solid #f1f5f9; padding-top: 0.6rem; width: 100%;">
+                    <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
+                        <div class="watched-status-pill ${isWatched ? 'watched' : ''}">
+                            <i data-lucide="${isWatched ? 'check-circle' : 'circle'}"></i>
+                            <span>${isWatched ? 'รับชมแล้ว' : 'ยังไม่ได้ชม'}</span>
+                        </div>
+                        <span style="font-size: 0.8rem; color: var(--text-secondary);">คลิกเพื่อเข้าชม <i data-lucide="chevron-right" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle;"></i></span>
                     </div>
-                    <span style="font-size: 0.8rem; color: var(--text-secondary);">คลิกเพื่อเข้าชม <i data-lucide="chevron-right" style="width: 12px; height: 12px; display: inline; vertical-align: middle;"></i></span>
+                    ${isWatched ? `
+                        <div style="font-size: 0.72rem; color: var(--text-secondary); font-family: 'Outfit', sans-serif; display: flex; align-items: center; gap: 0.2rem; margin-top: 0.15rem; width: 100%; border-top: 1px dashed rgba(0,0,0,0.06); padding-top: 0.35rem;">
+                            <i data-lucide="calendar" style="width: 11px; height: 11px; color: var(--blue);"></i>
+                            <span>เข้าชมเมื่อ: ${watchedTime}</span>
+                        </div>
+                    ` : ''}
                 </div>
             </div>
         `;
         
         grid.appendChild(card);
     });
-    
-    // Render user watch history table
-    const historyCard = document.getElementById("user-history-card");
-    const historyTbody = document.getElementById("user-history-tbody");
-    
-    if (historyCard && historyTbody) {
-        historyTbody.innerHTML = "";
-        const watchedVideos = videos.filter(v => userWatched.includes(v.id));
-        
-        if (watchedVideos.length > 0) {
-            historyCard.classList.remove("hidden");
-            watchedVideos.forEach(v => {
-                const tr = document.createElement("tr");
-                const watchedTime = (currentUser.watchedAt && currentUser.watchedAt[v.id]) 
-                    ? currentUser.watchedAt[v.id] 
-                    : (currentUser.regTime || "-");
-                
-                tr.innerHTML = `
-                    <td><strong>${v.title}</strong></td>
-                    <td style="white-space: nowrap;"><span class="category-pill">${v.category}</span></td>
-                    <td style="text-align: center; font-family: 'Outfit', sans-serif; font-weight: 600; color: var(--blue-d); white-space: nowrap;">
-                        ${watchedTime}
-                    </td>
-                `;
-                historyTbody.appendChild(tr);
-            });
-        } else {
-            historyCard.classList.add("hidden");
-        }
-    }
     
     lucide.createIcons();
 }
