@@ -1283,18 +1283,18 @@ function renderAdminVideosTable() {
     videos.forEach((video) => {
         const tr = document.createElement("tr");
         tr.innerHTML = `
-            <td><span class="category-pill">${video.category}</span></td>
+            <td style="white-space: nowrap;"><span class="category-pill">${video.category}</span></td>
             <td><strong style="color: var(--text-primary);">${video.title}</strong></td>
             <td><span style="font-size: 0.85rem; color: var(--text-secondary); display: block; max-height: 40px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 320px;">${video.description}</span></td>
-            <td>
-                ${video.url ? `<a href="${video.url}" target="_blank" style="color: var(--primary); text-decoration: none; display: flex; align-items: center; gap: 0.2rem;"><i data-lucide="external-link" style="width: 12px; height: 12px;"></i> ดูลิงก์จริง</a>` : `<span style="color: var(--text-secondary); font-style: italic;">ระบบเล่นจำลอง</span>`}
+            <td style="white-space: nowrap;">
+                ${video.url ? `<a href="${video.url}" target="_blank" style="color: var(--primary); text-decoration: none; display: flex; align-items: center; gap: 0.2rem; white-space: nowrap;"><i data-lucide="external-link" style="width: 12px; height: 12px;"></i> ดูลิงก์จริง</a>` : `<span style="color: var(--text-secondary); font-style: italic; white-space: nowrap;">ระบบเล่นจำลอง</span>`}
             </td>
-            <td style="text-align: center;">
-                <div class="button-group" style="justify-content: center;">
-                    <button class="btn btn-outline" style="padding: 0.35rem 0.6rem; font-size: 0.8rem; border-radius: 0.4rem;" onclick="openVideoModal('${video.id}')">
+            <td style="text-align: center; white-space: nowrap;">
+                <div class="button-group" style="justify-content: center; flex-wrap: nowrap; display: inline-flex; gap: 0.3rem;">
+                    <button class="btn btn-outline" style="padding: 0.35rem 0.6rem; font-size: 0.8rem; border-radius: 0.4rem; white-space: nowrap;" onclick="openVideoModal('${video.id}')">
                         <i data-lucide="edit" style="width: 12px; height: 12px;"></i> แก้ไข
                     </button>
-                    <button class="btn btn-danger-outline" style="padding: 0.35rem 0.6rem; font-size: 0.8rem; border-radius: 0.4rem;" onclick="deleteVideo('${video.id}')">
+                    <button class="btn btn-danger-outline" style="padding: 0.35rem 0.6rem; font-size: 0.8rem; border-radius: 0.4rem; white-space: nowrap;" onclick="deleteVideo('${video.id}')">
                         <i data-lucide="trash" style="width: 12px; height: 12px;"></i> ลบ
                     </button>
                 </div>
@@ -1344,19 +1344,19 @@ function renderAdminParticipantsTable() {
         
         const tr = document.createElement("tr");
         tr.innerHTML = `
-            <td><span class="category-pill" style="background-color: #fff8e0; border-color: rgba(253,197,0,0.25); color: var(--yellow-d);">${user.emptype || 'พนักงาน'}</span></td>
-            <td style="font-family: 'Outfit', sans-serif; font-weight: 500;">${user.empId || '-'}</td>
-            <td><strong>${user.name}</strong></td>
-            <td>${user.dept}</td>
-            <td style="font-family: 'Outfit', sans-serif; font-size: 0.85rem; color: var(--text-secondary);">${user.regTime}</td>
-            <td>
-                <span class="watched-status-pill ${watchedCount === totalCount && totalCount > 0 ? 'watched' : ''}" style="cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem;" onclick="showParticipantDetails('${userKey}')" title="คลิกดูประวัติรายบุคคล">
+            <td style="white-space: nowrap;"><span class="category-pill" style="background-color: #fff8e0; border-color: rgba(253,197,0,0.25); color: var(--yellow-d); white-space: nowrap;">${user.emptype || 'พนักงาน'}</span></td>
+            <td style="font-family: 'Outfit', sans-serif; font-weight: 500; white-space: nowrap;">${user.empId || '-'}</td>
+            <td style="white-space: nowrap;"><strong>${user.name}</strong></td>
+            <td style="white-space: nowrap;">${user.dept}</td>
+            <td style="font-family: 'Outfit', sans-serif; font-size: 0.85rem; color: var(--text-secondary); white-space: nowrap;">${user.regTime}</td>
+            <td style="white-space: nowrap;">
+                <span class="watched-status-pill ${watchedCount === totalCount && totalCount > 0 ? 'watched' : ''}" style="cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem; white-space: nowrap;" onclick="showParticipantDetails('${userKey}')" title="คลิกดูประวัติรายบุคคล">
                     <i data-lucide="${watchedCount === totalCount && totalCount > 0 ? 'trophy' : 'eye'}"></i>
                     <span>ชมแล้ว ${watchedCount}/${totalCount} คลิป</span>
                 </span>
             </td>
-            <td style="text-align: center;">
-                <div class="button-group" style="justify-content: center; gap: 0.3rem;">
+            <td style="text-align: center; white-space: nowrap;">
+                <div class="button-group" style="justify-content: center; gap: 0.3rem; flex-wrap: nowrap; display: inline-flex;">
                     <button class="btn btn-outline" style="padding: 0.25rem 0.45rem; font-size: 0.75rem; border-radius: 0.35rem;" onclick="openParticipantEditModal('${userKey}')" title="แก้ไขข้อมูล">
                         <i data-lucide="edit-2" style="width: 12px; height: 12px;"></i>
                     </button>
@@ -1411,8 +1411,8 @@ function renderAffiliationVideoStats() {
         const tr = document.createElement("tr");
         tr.innerHTML = `
             <td><strong style="color: var(--blue-d);">${video.title}</strong></td>
-            <td><span class="category-pill" style="font-size: 0.75rem; padding: 0.15rem 0.4rem;">${video.category}</span></td>
-            <td style="text-align: center; font-weight: 700; font-family: 'Outfit', sans-serif; color: var(--blue);">
+            <td style="white-space: nowrap;"><span class="category-pill" style="font-size: 0.75rem; padding: 0.15rem 0.4rem; white-space: nowrap;">${video.category}</span></td>
+            <td style="text-align: center; font-weight: 700; font-family: 'Outfit', sans-serif; color: var(--blue); white-space: nowrap;">
                 ${watchedCount} / ${filteredUsers.length} คน
             </td>
         `;
