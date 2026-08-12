@@ -200,7 +200,7 @@ async function checkOnlineStatus() {
     }
     
     try {
-        const res = await fetch("/api/db-status").catch(() => null);
+        const res = await fetch(`/api/db-status?t=${Date.now()}`).catch(() => null);
         if (res && res.ok) {
             const data = await res.json();
             isOnlineDb = !!data.online;
