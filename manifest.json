@@ -1,6 +1,6 @@
 {
-  "name": "EnergySave Video Portal - กฟผ. ไทรน้อย",
-  "short_name": "EnergySave",
+  "name": "EGAT Sainoi Smart Energy Video Hub - กฟผ. ไทรน้อย",
+  "short_name": "Sainoi Hub",
   "description": "ระบบลงทะเบียนและรับชมสื่อการเรียนรู้เพื่อปลูกจิตสำนึกการอนุรักษ์พลังงาน กฟผ. ไทรน้อย",
   "start_url": "index.html",
   "display": "standalone",
