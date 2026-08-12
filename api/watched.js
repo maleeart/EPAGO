@@ -44,6 +44,18 @@ export default async function handler(req, res) {
       user.watched.push(videoId);
     }
 
+    if (!user.watchedAt) {
+      user.watchedAt = {};
+    }
+
+    if (!user.watchedAt[videoId]) {
+      const now = new Date();
+      const tzOffset = 7 * 60; // mins
+      const localTime = new Date(now.getTime() + tzOffset * 60000);
+      const formattedDate = `${localTime.getUTCFullYear()}-${String(localTime.getUTCMonth() + 1).padStart(2, '0')}-${String(localTime.getUTCDate()).padStart(2, '0')} ${String(localTime.getUTCHours()).padStart(2, '0')}:${String(localTime.getUTCMinutes()).padStart(2, '0')}`;
+      user.watchedAt[videoId] = formattedDate;
+    }
+
     await saveParticipant(user);
     res.status(200).json({ ok: true, user });
   } catch (e) {

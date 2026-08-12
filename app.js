@@ -15,6 +15,11 @@ const normalizeName = name => {
         .replace(/\s+/g, "");
 };
 
+function getCurrentTimestamp() {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+}
+
 // Calculate Levenshtein Distance between two strings to find similar names (typos)
 const getLevenshteinDistance = (a, b) => {
     const matrix = [];
@@ -286,8 +291,10 @@ async function syncCurrentUserWatchedProgress() {
         });
         const resData = await response.json();
         if (response.ok && resData.ok && resData.user) {
+            currentUser = resData.user;
+            localStorage.setItem(DB_CURRENT_USER_KEY, JSON.stringify(currentUser));
             const userKey = currentUser.empId || currentUser.name;
-            watchedLogs[userKey] = resData.user.watched || [];
+            watchedLogs[userKey] = currentUser.watched || [];
             localStorage.setItem(DB_WATCHED_KEY, JSON.stringify(watchedLogs));
             renderUserLobby();
         }
@@ -857,6 +864,36 @@ function renderUserLobby() {
         grid.appendChild(card);
     });
     
+    // Render user watch history table
+    const historyCard = document.getElementById("user-history-card");
+    const historyTbody = document.getElementById("user-history-tbody");
+    
+    if (historyCard && historyTbody) {
+        historyTbody.innerHTML = "";
+        const watchedVideos = videos.filter(v => userWatched.includes(v.id));
+        
+        if (watchedVideos.length > 0) {
+            historyCard.classList.remove("hidden");
+            watchedVideos.forEach(v => {
+                const tr = document.createElement("tr");
+                const watchedTime = (currentUser.watchedAt && currentUser.watchedAt[v.id]) 
+                    ? currentUser.watchedAt[v.id] 
+                    : (currentUser.regTime || "-");
+                
+                tr.innerHTML = `
+                    <td><strong>${v.title}</strong></td>
+                    <td style="white-space: nowrap;"><span class="category-pill">${v.category}</span></td>
+                    <td style="text-align: center; font-family: 'Outfit', sans-serif; font-weight: 600; color: var(--blue-d); white-space: nowrap;">
+                        ${watchedTime}
+                    </td>
+                `;
+                historyTbody.appendChild(tr);
+            });
+        } else {
+            historyCard.classList.add("hidden");
+        }
+    }
+    
     lucide.createIcons();
 }
 
@@ -1041,6 +1078,8 @@ function localWatchFallback(userKey, videoId, isNewWatch) {
         watchedLogs[userKey].push(videoId);
         localStorage.setItem(DB_WATCHED_KEY, JSON.stringify(watchedLogs));
         
+        const watchTime = getCurrentTimestamp();
+        
         // Sync to local participants state
         if (currentUser) {
             const pIndex = participants.findIndex(p => {
@@ -1055,6 +1094,8 @@ function localWatchFallback(userKey, videoId, isNewWatch) {
                 if (!participants[pIndex].watched.includes(videoId)) {
                     participants[pIndex].watched.push(videoId);
                 }
+                if (!participants[pIndex].watchedAt) participants[pIndex].watchedAt = {};
+                participants[pIndex].watchedAt[videoId] = watchTime;
                 localStorage.setItem(DB_USERS_KEY, JSON.stringify(participants));
             }
             
@@ -1063,6 +1104,8 @@ function localWatchFallback(userKey, videoId, isNewWatch) {
             if (!currentUser.watched.includes(videoId)) {
                 currentUser.watched.push(videoId);
             }
+            if (!currentUser.watchedAt) currentUser.watchedAt = {};
+            currentUser.watchedAt[videoId] = watchTime;
             localStorage.setItem(DB_CURRENT_USER_KEY, JSON.stringify(currentUser));
         }
         
@@ -1115,6 +1158,7 @@ async function markCurrentVideoWatched() {
                 });
                 if (pIndex !== -1) {
                     participants[pIndex].watched = currentUser.watched || [];
+                    participants[pIndex].watchedAt = currentUser.watchedAt || {};
                     localStorage.setItem(DB_USERS_KEY, JSON.stringify(participants));
                 }
                 
@@ -1568,10 +1612,19 @@ function showParticipantDetails(userKey) {
                 </div>
             ` : videos.map(video => {
                 const isWatched = userWatched.includes(video.id);
+                const watchedTime = (user.watchedAt && user.watchedAt[video.id]) 
+                    ? user.watchedAt[video.id] 
+                    : (user.regTime || "-");
+                
                 return `
                     <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.55rem 0.75rem; background-color: ${isWatched ? 'rgba(74,222,128,0.06)' : 'rgba(239,68,68,0.04)'}; border: 1px solid ${isWatched ? 'rgba(74,222,128,0.2)' : 'rgba(239,68,68,0.15)'}; border-radius: 0.4rem;">
                         <div style="font-size: 0.88rem; font-weight: 600; color: var(--text-primary); text-align: left; flex: 1; padding-right: 0.5rem; line-height: 1.35;">
-                            ${video.title}
+                            <div>${video.title}</div>
+                            ${isWatched ? `
+                                <div style="font-size: 0.75rem; font-weight: normal; color: var(--text-secondary); margin-top: 2px;">
+                                    เข้าชมเมื่อ: ${watchedTime}
+                                </div>
+                            ` : ''}
                         </div>
                         <div style="flex-shrink: 0;">
                             ${isWatched 
@@ -1756,20 +1809,53 @@ function exportParticipantsToCSV() {
     }
     
     // Header Row in Thai
-    let csvContent = "ประเภทบุคลากร,รหัสพนักงาน,ชื่อ - สกุล,สังกัด,วันเวลาลงทะเบียน,จำนวนวิดีโอที่ดูเสร็จสิ้น,สถานะการชมคลังสื่อทั้งหมด\n";
+    let headers = ["ประเภทบุคลากร", "รหัสพนักงาน", "ชื่อ - สกุล", "สังกัด", "วันเวลาลงทะเบียน", "จำนวนวิดีโอที่ดูเสร็จสิ้น", "สถานะการชมคลังสื่อทั้งหมด"];
+    
+    // Append a header column for each video in the library
+    videos.forEach(v => {
+        headers.push(`การชม: ${v.title}`);
+    });
+    
+    let csvContent = headers.map(h => `"${h.replace(/"/g, '""')}"`).join(",") + "\n";
     
     participants.forEach(user => {
-        const userWatched = watchedLogs[user.empId] || [];
+        const userKey = user.empId || user.name;
+        const userWatched = watchedLogs[userKey] || [];
         const totalCount = videos.length;
         const watchedCount = userWatched.filter(id => videos.some(v => v.id === id)).length;
         const statusText = (watchedCount === totalCount && totalCount > 0) ? "รับชมครบถ้วน" : "กำลังรับชม";
         
-        // Escape commas and double quotes for clean CSV
-        const safeName = `"${user.name.replace(/"/g, '""')}"`;
-        const safeDept = `"${user.dept.replace(/"/g, '""')}"`;
+        // Basic fields
         const typeText = user.emptype || "พนักงาน";
+        const empIdText = user.empId || "-";
+        const nameText = user.name || "-";
+        const deptText = user.dept || "-";
+        const regTimeText = user.regTime || "-";
         
-        csvContent += `${typeText},${user.empId},${safeName},${safeDept},${user.regTime},${watchedCount}/${totalCount},${statusText}\n`;
+        const row = [
+            typeText,
+            empIdText,
+            nameText,
+            deptText,
+            regTimeText,
+            `${watchedCount}/${totalCount}`,
+            statusText
+        ];
+        
+        // Append watch timestamp or "-" for each video
+        videos.forEach(v => {
+            const isWatched = userWatched.includes(v.id);
+            if (isWatched) {
+                const watchedTime = (user.watchedAt && user.watchedAt[v.id]) 
+                    ? user.watchedAt[v.id] 
+                    : (user.regTime || "ชมแล้ว");
+                row.push(watchedTime);
+            } else {
+                row.push("ยังไม่ชม");
+            }
+        });
+        
+        csvContent += row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(",") + "\n";
     });
     
     // Add UTF-8 BOM byte sequence (EF BB BF) so Microsoft Excel opens it with proper Thai characters encoding
