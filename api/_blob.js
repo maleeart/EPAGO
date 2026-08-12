@@ -21,8 +21,8 @@ export function getBlobKey(user) {
 }
 
 function checkToken() {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    throw new Error("ฐานข้อมูลคลาวด์ขัดข้อง: ไม่พบ BLOB_READ_WRITE_TOKEN กรุณาเชื่อมต่อ Vercel Blob Storage ในหน้า Vercel Dashboard");
+  if (!process.env.BLOB_READ_WRITE_TOKEN && !process.env.VERCEL_OIDC_TOKEN && !process.env.BLOB_STORE_ID) {
+    throw new Error("ฐานข้อมูลคลาวด์ขัดข้อง: ไม่พบตัวแปรการเชื่อมต่อ Vercel Blob (BLOB_READ_WRITE_TOKEN หรือ BLOB_STORE_ID) กรุณาเชื่อมต่อ Vercel Blob Storage ในหน้า Vercel Dashboard");
   }
 }
 
