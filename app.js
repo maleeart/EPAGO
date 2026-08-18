@@ -903,9 +903,9 @@ function playVideo(videoId) {
         } else {
             renderSimulatedPlayer(video);
         }
-    } else if (video.url && video.url.endsWith(".mp4")) {
+    } else if (video.url && (video.url.toLowerCase().includes(".mp4") || video.url.toLowerCase().split('?')[0].endsWith(".mp4"))) {
         embedContainer.innerHTML = `
-            <video controls autoplay>
+            <video controls autoplay style="width: 100%; height: 100%; object-fit: contain; border-radius: 0.5rem; background: #000;">
                 <source src="${video.url}" type="video/mp4">
                 เบราว์เซอร์ของคุณไม่สนับสนุนการเล่นวิดีโอ
             </video>
