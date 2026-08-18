@@ -1,6 +1,6 @@
 import { readVideos, saveVideos } from "./_blob.js";
 
-const CURRENT_VIDEOS_VERSION = "v1.5";
+const CURRENT_VIDEOS_VERSION = "v1.6";
 
 const DEFAULT_VIDEOS = [
   {
@@ -8,8 +8,16 @@ const DEFAULT_VIDEOS = [
     category: "ทั่วไป",
     title: "12 วิธีประหยัดพลังงานในที่ทำงาน 💡",
     description: "เคล็ดลับการอนุรักษ์พลังงานในที่ทำงานและสำนักงานอย่างมีประสิทธิภาพสูงสุด 12 วิธีที่ทำตามได้จริงและเห็นผลลัพธ์ทันที",
-    url: "https://www.youtube.com/watch?v=kYJUp5WwFik",
+    url: "https://www.youtube.com/watch?v=kYJ41S2i2s0",
     duration: "3:30"
+  },
+  {
+    id: "vid-2",
+    category: "ในบ้าน",
+    title: "8 วิธีประหยัดพลังงานในบ้านคุณ 🏠",
+    description: "เคล็ดลับและแนวทางปฏิบัติจริงในการประหยัดไฟฟ้าและอนุรักษ์พลังงานภายในบ้านเพื่อลดค่าไฟอย่างเห็นผล",
+    url: "video/8_ways_save_energy.mp4",
+    duration: "2:15"
   }
 ];
 
