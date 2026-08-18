@@ -5,7 +5,7 @@
     <script>
         // Force database reset on version mismatch (inline to ensure it runs immediately)
         (function() {
-            var CURRENT_VERSION = "v1.8";
+            var CURRENT_VERSION = "v1.9";
             if (localStorage.getItem("db_version") !== CURRENT_VERSION) {
                 localStorage.removeItem("energysave_videos");
                 localStorage.setItem("db_version", CURRENT_VERSION);
@@ -34,7 +34,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <!-- Lucide Icons for premium feel -->
     <script src="https://unpkg.com/lucide@latest"></script>
-    <link rel="stylesheet" href="style.css?v=1.8">
+    <link rel="stylesheet" href="style.css?v=1.9">
 </head>
 <body>
     <!-- Background Decor Elements -->
@@ -600,6 +600,6 @@
             lucide.createIcons();
         });
     </script>
-    <script src="app.js?v=1.8"></script>
+    <script src="app.js?v=1.9"></script>
 </body>
 </html>

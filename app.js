@@ -48,7 +48,7 @@ const DEFAULT_VIDEOS = [
         category: "ทั่วไป",
         title: "12 วิธีประหยัดพลังงานในที่ทำงาน 💡",
         description: "เคล็ดลับการอนุรักษ์พลังงานในที่ทำงานและสำนักงานอย่างมีประสิทธิภาพสูงสุด 12 วิธีที่ทำตามได้จริงและเห็นผลลัพธ์ทันที",
-        url: "https://www.youtube.com/watch?v=kYJUp5WwFik",
+        url: "https://www.youtube.com/watch?v=I93aV7Y49LI",
         duration: "3:30"
     },
     {
@@ -384,7 +384,7 @@ async function migrateLocalDataToCloud() {
 // Seed data storage if empty
 function initDatabase() {
     // Database Versioning / Force Reset for default videos
-    const DB_VERSION = "v1.8";
+    const DB_VERSION = "v1.9";
     if (localStorage.getItem("db_version") !== DB_VERSION) {
         localStorage.setItem(DB_VIDEOS_KEY, JSON.stringify(DEFAULT_VIDEOS));
         localStorage.setItem("db_version", DB_VERSION);
@@ -847,14 +847,16 @@ function renderUserLobby() {
                 <span class="category-badge">${video.category}</span>
                 <span class="duration-tag"><i data-lucide="clock" style="width: 10px; height: 10px; display: inline; vertical-align: middle;"></i> ${video.duration}</span>
                 
+                <div class="thumbnail-placeholder ${thumbnailUrl ? 'hidden' : ''}">
+                    <i data-lucide="play-circle"></i>
+                    <span>รับชมคลิปวิดีโอ</span>
+                </div>
+                
                 ${thumbnailUrl ? `
-                    <img src="${thumbnailUrl}" alt="${video.title}" class="video-thumbnail-img" style="width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0; border-radius: 0.75rem 0.75rem 0 0; border: none; outline: none;">
-                ` : `
-                    <div class="thumbnail-placeholder">
-                        <i data-lucide="play-circle"></i>
-                        <span>รับชมคลิปวิดีโอ</span>
-                    </div>
-                `}
+                    <img src="${thumbnailUrl}" alt="${video.title}" class="video-thumbnail-img" 
+                         onerror="this.onerror=null; this.classList.add('hidden'); const p = this.parentNode.querySelector('.thumbnail-placeholder'); if(p) p.classList.remove('hidden');"
+                         style="width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0; border-radius: 0.75rem 0.75rem 0 0; border: none; outline: none;">
+                ` : ''}
                 
                 <div class="play-overlay">
                     <i data-lucide="play"></i>

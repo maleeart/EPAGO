@@ -1,6 +1,6 @@
 import { readVideos, saveVideos } from "./_blob.js";
 
-const CURRENT_VIDEOS_VERSION = "v1.8";
+const CURRENT_VIDEOS_VERSION = "v1.9";
 
 const DEFAULT_VIDEOS = [
   {
@@ -8,7 +8,7 @@ const DEFAULT_VIDEOS = [
     category: "ทั่วไป",
     title: "12 วิธีประหยัดพลังงานในที่ทำงาน 💡",
     description: "เคล็ดลับการอนุรักษ์พลังงานในที่ทำงานและสำนักงานอย่างมีประสิทธิภาพสูงสุด 12 วิธีที่ทำตามได้จริงและเห็นผลลัพธ์ทันที",
-    url: "https://www.youtube.com/watch?v=kYJUp5WwFik",
+    url: "https://www.youtube.com/watch?v=I93aV7Y49LI",
     duration: "3:30"
   },
   {
