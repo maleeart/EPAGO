@@ -1,6 +1,6 @@
 import { readVideos, saveVideos } from "./_blob.js";
 
-const CURRENT_VIDEOS_VERSION = "v1.7";
+const CURRENT_VIDEOS_VERSION = "v1.8";
 
 const DEFAULT_VIDEOS = [
   {
@@ -17,6 +17,7 @@ const DEFAULT_VIDEOS = [
     title: "8 วิธีประหยัดพลังงานในบ้านคุณ 🏠",
     description: "เคล็ดลับและแนวทางปฏิบัติจริงในการประหยัดไฟฟ้าและอนุรักษ์พลังงานภายในบ้านเพื่อลดค่าไฟอย่างเห็นผล",
     url: "video/8_ways_save_energy.mp4",
+    thumbnailUrl: "video/home_energy_saving_cover.jpg",
     duration: "2:15"
   }
 ];

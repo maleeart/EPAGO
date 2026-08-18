@@ -57,6 +57,7 @@ const DEFAULT_VIDEOS = [
         title: "8 วิธีประหยัดพลังงานในบ้านคุณ 🏠",
         description: "เคล็ดลับและแนวทางปฏิบัติจริงในการประหยัดไฟฟ้าและอนุรักษ์พลังงานภายในบ้านเพื่อลดค่าไฟอย่างเห็นผล",
         url: "video/8_ways_save_energy.mp4",
+        thumbnailUrl: "video/home_energy_saving_cover.jpg",
         duration: "2:15"
     }
 ];
@@ -383,7 +384,7 @@ async function migrateLocalDataToCloud() {
 // Seed data storage if empty
 function initDatabase() {
     // Database Versioning / Force Reset for default videos
-    const DB_VERSION = "v1.5";
+    const DB_VERSION = "v1.8";
     if (localStorage.getItem("db_version") !== DB_VERSION) {
         localStorage.setItem(DB_VIDEOS_KEY, JSON.stringify(DEFAULT_VIDEOS));
         localStorage.setItem("db_version", DB_VERSION);
@@ -832,7 +833,7 @@ function renderUserLobby() {
     videos.forEach(video => {
         const isWatched = userWatched.includes(video.id);
         const ytId = video.url ? getYoutubeId(video.url) : null;
-        const thumbnailUrl = ytId ? `https://img.youtube.com/vi/${ytId}/hqdefault.jpg` : "";
+        const thumbnailUrl = video.thumbnailUrl || (ytId ? `https://img.youtube.com/vi/${ytId}/hqdefault.jpg` : "");
         const watchedTime = (currentUser.watchedAt && currentUser.watchedAt[video.id]) 
             ? currentUser.watchedAt[video.id] 
             : (currentUser.regTime || "-");

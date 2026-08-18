@@ -2,6 +2,44 @@ import { put, list, del } from "@vercel/blob";
 
 const PREFIX = "epago/participants/";
 
+export function getStoreDomain() {
+  const storeId = process.env.BLOB_STORE_ID;
+  if (storeId) {
+    return `${storeId}.public.blob.vercel-storage.com`;
+  }
+  const token = process.env.BLOB_READ_WRITE_TOKEN;
+  if (token) {
+    const parts = token.split("_");
+    if (parts.length >= 4) {
+      return `${parts[3]}.public.blob.vercel-storage.com`;
+    }
+  }
+  return null;
+}
+
+export async function readParticipant(key) {
+  checkToken();
+  const domain = getStoreDomain();
+  if (!domain) {
+    const { blobs } = await list({ prefix: `${PREFIX}${key}.json` });
+    if (blobs && blobs.length > 0) {
+      return await fetch(`${blobs[0].url}?t=${Date.now()}`).then(r => r.json());
+    }
+    return null;
+  }
+  const url = `https://${domain}/${PREFIX}${key}.json?t=${Date.now()}`;
+  try {
+    const res = await fetch(url);
+    if (res.ok) {
+      return await res.json();
+    }
+    return null;
+  } catch (e) {
+    console.error(`Failed to read direct participant:`, e);
+    return null;
+  }
+}
+
 // Helper to normalize contractor names to strip spaces and symbols for clean blob filenames
 const normalizeName = name => {
   if (!name) return "";
