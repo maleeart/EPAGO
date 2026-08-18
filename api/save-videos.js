@@ -1,5 +1,6 @@
 import { saveVideos } from "./_blob.js";
 import { authed } from "./_auth.js";
+import { CURRENT_VIDEOS_VERSION } from "./videos.js";
 
 export default async function handler(req, res) {
   if (!authed(req, res)) return;
@@ -13,7 +14,7 @@ export default async function handler(req, res) {
 
   try {
     const payload = {
-      version: "v1.5",
+      version: CURRENT_VIDEOS_VERSION,
       videos: videos
     };
     await saveVideos(payload);

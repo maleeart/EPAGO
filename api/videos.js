@@ -1,6 +1,6 @@
 import { readVideos, saveVideos } from "./_blob.js";
 
-const CURRENT_VIDEOS_VERSION = "v1.9";
+export const CURRENT_VIDEOS_VERSION = "v1.9";
 
 const DEFAULT_VIDEOS = [
   {
@@ -40,14 +40,39 @@ export default async function handler(req, res) {
     }
     
     // Seed or Force Update if version mismatch
-    if (!videos || version !== CURRENT_VIDEOS_VERSION) {
+    if (!videos) {
       videos = DEFAULT_VIDEOS;
       if (process.env.BLOB_READ_WRITE_TOKEN) {
-        const payload = {
-          version: CURRENT_VIDEOS_VERSION,
-          videos: DEFAULT_VIDEOS
-        };
-        await saveVideos(payload).catch(e => console.error("Failed to seed/migrate videos:", e));
+        await saveVideos({ version: CURRENT_VIDEOS_VERSION, videos }).catch(e => console.error("Failed to seed videos:", e));
+      }
+    } else if (version !== CURRENT_VIDEOS_VERSION) {
+      // Migrate existing videos: preserve admin edits, but add new default videos and missing fields
+      const updatedVideos = [...videos];
+      
+      DEFAULT_VIDEOS.forEach(defaultVid => {
+        const existingIdx = updatedVideos.findIndex(v => v.id === defaultVid.id);
+        if (existingIdx === -1) {
+          // New video introduced in this version (e.g. local video)
+          updatedVideos.push(defaultVid);
+        } else {
+          // Video exists, let's add any new fields (like thumbnailUrl) that are in defaultVid but missing in existing
+          const existingVid = updatedVideos[existingIdx];
+          let changed = false;
+          Object.keys(defaultVid).forEach(key => {
+            if (existingVid[key] === undefined) {
+              existingVid[key] = defaultVid[key];
+              changed = true;
+            }
+          });
+          if (changed) {
+            updatedVideos[existingIdx] = existingVid;
+          }
+        }
+      });
+      
+      videos = updatedVideos;
+      if (process.env.BLOB_READ_WRITE_TOKEN) {
+        await saveVideos({ version: CURRENT_VIDEOS_VERSION, videos }).catch(e => console.error("Failed to migrate videos:", e));
       }
     }
     
