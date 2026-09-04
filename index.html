@@ -5,7 +5,7 @@
     <script>
         // Force database reset on version mismatch (inline to ensure it runs immediately)
         (function() {
-            var CURRENT_VERSION = "v2.0";
+            var CURRENT_VERSION = "v2.1";
             if (localStorage.getItem("db_version") !== CURRENT_VERSION) {
                 localStorage.removeItem("energysave_videos");
                 localStorage.setItem("db_version", CURRENT_VERSION);
@@ -459,8 +459,12 @@
                 </div>
             </div>
 
-            <div class="video-player-actions">
-                <button id="mark-watched-btn" class="btn btn-emerald btn-block" onclick="markCurrentVideoWatched()">
+            <div class="video-player-actions" style="margin-top: 1rem;">
+                <div style="background: #ecfdf5; border: 1px solid #10b981; border-radius: 0.5rem; padding: 0.6rem 0.85rem; margin-bottom: 0.6rem; display: flex; align-items: center; gap: 0.5rem; color: #065f46; font-size: 0.85rem;">
+                    <i data-lucide="sparkles" style="width: 18px; height: 18px; color: #10b981; flex-shrink: 0;"></i>
+                    <span>เมื่อรับชมคลิปจบระบบจะบันทึกให้อัตโนมัติ หรือคลิกปุ่มเขียวด้านล่างเพื่อยืนยันได้ทันที:</span>
+                </div>
+                <button id="mark-watched-btn" class="btn btn-emerald btn-block" onclick="markCurrentVideoWatched()" style="padding: 0.85rem; font-size: 1rem; font-weight: 700; box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);">
                     <i data-lucide="check-circle2"></i> ยืนยันการรับชมคลิปนี้สำเร็จ
                 </button>
             </div>
@@ -600,6 +604,6 @@
             lucide.createIcons();
         });
     </script>
-    <script src="app.js?v=2.0"></script>
+    <script src="app.js?v=2.1"></script>
 </body>
 </html>

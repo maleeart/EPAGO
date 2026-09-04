@@ -301,10 +301,40 @@ async function syncCurrentUserWatchedProgress() {
         });
         const resData = await response.json().catch(() => ({}));
         if (response.ok && resData.ok && resData.user) {
-            currentUser = resData.user;
-            localStorage.setItem(DB_CURRENT_USER_KEY, JSON.stringify(currentUser));
+            const cloudUser = resData.user;
             const userKey = currentUser.empId || currentUser.name;
-            watchedLogs[userKey] = currentUser.watched || [];
+            const localWatched = Array.isArray(currentUser.watched) ? currentUser.watched : (watchedLogs[userKey] || []);
+            const cloudWatched = Array.isArray(cloudUser.watched) ? cloudUser.watched : [];
+
+            // If local device has watched videos that cloud does not have, upload to cloud immediately
+            const missingOnCloud = localWatched.filter(id => !cloudWatched.includes(id));
+            if (missingOnCloud.length > 0) {
+                for (const vId of missingOnCloud) {
+                    await fetch("/api/watched", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            emptype: currentUser.emptype,
+                            name: currentUser.name,
+                            empId: currentUser.empId,
+                            dept: currentUser.dept,
+                            regTime: currentUser.regTime,
+                            videoId: vId
+                        })
+                    }).catch(e => console.warn("Failed to push missing watch to cloud:", e));
+                }
+            }
+
+            const mergedWatched = Array.from(new Set([...cloudWatched, ...localWatched]));
+            const mergedWatchedAt = { ...(cloudUser.watchedAt || {}), ...(currentUser.watchedAt || {}) };
+
+            currentUser = {
+                ...cloudUser,
+                watched: mergedWatched,
+                watchedAt: mergedWatchedAt
+            };
+            localStorage.setItem(DB_CURRENT_USER_KEY, JSON.stringify(currentUser));
+            watchedLogs[userKey] = mergedWatched;
             localStorage.setItem(DB_WATCHED_KEY, JSON.stringify(watchedLogs));
             renderUserLobby();
         } else if (response.status === 404 && isOnlineDb) {
@@ -411,7 +441,7 @@ async function migrateLocalDataToCloud() {
 // Seed data storage if empty
 function initDatabase() {
     // Database Versioning / Force Reset for default videos
-    const DB_VERSION = "v2.0";
+    const DB_VERSION = "v2.1";
     if (localStorage.getItem("db_version") !== DB_VERSION) {
         localStorage.setItem(DB_VIDEOS_KEY, JSON.stringify(DEFAULT_VIDEOS));
         localStorage.setItem("db_version", DB_VERSION);
@@ -769,12 +799,42 @@ async function handleReturningLogin(e) {
             });
             const resData = await response.json();
             if (response.ok && resData.ok && resData.user) {
-                currentUser = resData.user;
+                const cloudUser = resData.user;
+                const userKey = cloudUser.empId || cloudUser.name;
+                const localWatched = (currentUser && (currentUser.empId === cloudUser.empId || currentUser.name === cloudUser.name) && Array.isArray(currentUser.watched))
+                    ? currentUser.watched 
+                    : (watchedLogs[userKey] || []);
+                const cloudWatched = Array.isArray(cloudUser.watched) ? cloudUser.watched : [];
+
+                // If local has watched clips missing on cloud, push to cloud
+                const missingOnCloud = localWatched.filter(id => !cloudWatched.includes(id));
+                if (missingOnCloud.length > 0) {
+                    for (const vId of missingOnCloud) {
+                        fetch("/api/watched", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                                emptype: cloudUser.emptype,
+                                name: cloudUser.name,
+                                empId: cloudUser.empId,
+                                dept: cloudUser.dept,
+                                regTime: cloudUser.regTime,
+                                videoId: vId
+                            })
+                        }).catch(e => console.warn("Failed to push missing watch on login:", e));
+                    }
+                }
+
+                const mergedWatched = Array.from(new Set([...cloudWatched, ...localWatched]));
+                currentUser = {
+                    ...cloudUser,
+                    watched: mergedWatched,
+                    watchedAt: { ...(cloudUser.watchedAt || {}), ...(currentUser && currentUser.watchedAt ? currentUser.watchedAt : {}) }
+                };
                 localStorage.setItem(DB_CURRENT_USER_KEY, JSON.stringify(currentUser));
                 
                 // Sync to local representation
-                const userKey = currentUser.empId || currentUser.name;
-                watchedLogs[userKey] = currentUser.watched || [];
+                watchedLogs[userKey] = mergedWatched;
                 localStorage.setItem(DB_WATCHED_KEY, JSON.stringify(watchedLogs));
                 
                 // Add to local participants if missing
@@ -943,11 +1003,20 @@ function playVideo(videoId) {
         }
     } else if (video.url && (video.url.toLowerCase().includes(".mp4") || video.url.toLowerCase().split('?')[0].endsWith(".mp4"))) {
         embedContainer.innerHTML = `
-            <video controls autoplay style="width: 100%; height: 100%; object-fit: contain; border-radius: 0.5rem; background: #000;">
+            <video id="html5-active-video" controls autoplay style="width: 100%; height: 100%; object-fit: contain; border-radius: 0.5rem; background: #000;">
                 <source src="${video.url}" type="video/mp4">
                 เบราว์เซอร์ของคุณไม่สนับสนุนการเล่นวิดีโอ
             </video>
         `;
+        setTimeout(() => {
+            const vid = document.getElementById("html5-active-video");
+            if (vid) {
+                vid.onended = () => {
+                    markCurrentVideoWatched();
+                    showToast("คุณรับชมคลิปนี้จบแล้ว ระบบบันทึกประวัติให้อัตโนมัติ 🎉");
+                };
+            }
+        }, 100);
     } else {
         // Fallback: Custom premium simulated video player
         renderSimulatedPlayer(video);
@@ -1029,7 +1098,8 @@ function toggleSimPlay(totalSeconds) {
                 playBtn.classList.remove("playing");
                 playIcon.setAttribute("data-lucide", "rotate-ccw");
                 statusTitle.innerHTML = "<span style='color: var(--primary);'>รับชมวิดีโอจำลองสำเร็จแล้ว! 🎉</span>";
-                showToast("จำลองการรับชมวิดีโอสำเร็จ");
+                markCurrentVideoWatched();
+                showToast("จำลองการรับชมวิดีโอสำเร็จ ระบบบันทึกประวัติให้อัตโนมัติ 🎉");
             }
             
             updateSimPlayerUI();
@@ -1349,7 +1419,7 @@ function renderAffiliationRegistrationSummary() {
     // Process each participant
     participants.forEach(user => {
         const userKey = user.empId || user.name;
-        const userWatched = watchedLogs[userKey] || [];
+        const userWatched = (user && Array.isArray(user.watched) && user.watched.length > 0) ? user.watched : (watchedLogs[userKey] || []);
         const watchedCount = userWatched.filter(id => videos.some(v => v.id === id)).length;
         
         const isCompleted = (totalVideosCount > 0 && watchedCount === totalVideosCount);
@@ -1513,7 +1583,7 @@ function renderAdminParticipantsTable() {
     
     sortedParticipants.forEach(user => {
         const userKey = user.empId || user.name;
-        const userWatched = watchedLogs[userKey] || [];
+        const userWatched = (user && Array.isArray(user.watched) && user.watched.length > 0) ? user.watched : (watchedLogs[userKey] || []);
         const totalCount = videos.length;
         const watchedCount = userWatched.filter(id => videos.some(v => v.id === id)).length;
         const blobUrl = user._blobUrl || "";
@@ -1526,7 +1596,7 @@ function renderAdminParticipantsTable() {
             <td style="white-space: nowrap;">${user.dept}</td>
             <td style="font-family: 'Outfit', sans-serif; font-size: 0.85rem; color: var(--text-secondary); white-space: nowrap;">${user.regTime}</td>
             <td style="white-space: nowrap;">
-                <span class="watched-status-pill ${watchedCount === totalCount && totalCount > 0 ? 'watched' : ''}" style="cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem; white-space: nowrap;" onclick="showParticipantDetails('${userKey}')" title="คลิกดูประวัติรายบุคคล">
+                <span class="watched-status-pill ${watchedCount === totalCount && totalCount > 0 ? 'watched' : ''}" style="cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem; white-space: nowrap;" onclick="showParticipantDetails('${userKey}')" title="คลิกดูและจัดการสถานะรายบุคคล">
                     <i data-lucide="${watchedCount === totalCount && totalCount > 0 ? 'trophy' : 'eye'}"></i>
                     <span>ชมแล้ว ${watchedCount}/${totalCount} คลิป</span>
                 </span>
@@ -1578,7 +1648,7 @@ function renderAffiliationVideoStats() {
         let watchedCount = 0;
         filteredUsers.forEach(user => {
             const userKey = user.empId || user.name;
-            const watched = watchedLogs[userKey] || [];
+            const watched = (user && Array.isArray(user.watched) && user.watched.length > 0) ? user.watched : (watchedLogs[userKey] || []);
             if (watched.includes(video.id)) {
                 watchedCount++;
             }
@@ -1601,10 +1671,10 @@ function renderAffiliationVideoStats() {
 
 // Show popup details of watched/unwatched videos for a specific participant
 function showParticipantDetails(userKey) {
-    const user = participants.find(p => (p.empId && p.empId === userKey) || (!p.empId && p.name === userKey));
+    const user = participants.find(p => (p.empId && (p.empId === userKey || p.empId.toUpperCase() === userKey.toUpperCase())) || (!p.empId && (p.name === userKey || normalizeName(p.name) === normalizeName(userKey))));
     if (!user) return;
     
-    const userWatched = watchedLogs[userKey] || [];
+    const userWatched = (user && Array.isArray(user.watched) && user.watched.length > 0) ? user.watched : (watchedLogs[userKey] || []);
     const totalCount = videos.length;
     
     const body = document.getElementById("participant-detail-body");
@@ -1626,7 +1696,7 @@ function showParticipantDetails(userKey) {
             ความคืบหน้าการรับชม (${userWatched.length}/${totalCount} คลิป)
         </h4>
         
-        <div style="max-height: 250px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.5rem; padding-right: 4px;">
+        <div style="max-height: 280px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.55rem; padding-right: 4px;">
             ${videos.length === 0 ? `
                 <div style="text-align: center; color: var(--text-secondary); font-size: 0.9rem; padding: 1rem 0;">
                     ไม่มีคลิปวิดีโอในระบบ
@@ -1636,10 +1706,14 @@ function showParticipantDetails(userKey) {
                 const watchedTime = (user.watchedAt && user.watchedAt[video.id]) 
                     ? user.watchedAt[video.id] 
                     : (user.regTime || "-");
+                const safeEmpId = encodeURIComponent(user.empId || "");
+                const safeName = encodeURIComponent(user.name || "");
+                const safeEmpType = encodeURIComponent(user.emptype || "");
+                const safeVideoId = encodeURIComponent(video.id);
                 
                 return `
-                    <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.55rem 0.75rem; background-color: ${isWatched ? 'rgba(74,222,128,0.06)' : 'rgba(239,68,68,0.04)'}; border: 1px solid ${isWatched ? 'rgba(74,222,128,0.2)' : 'rgba(239,68,68,0.15)'}; border-radius: 0.4rem;">
-                        <div style="font-size: 0.88rem; font-weight: 600; color: var(--text-primary); text-align: left; flex: 1; padding-right: 0.5rem; line-height: 1.35;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.6rem 0.85rem; background-color: ${isWatched ? 'rgba(74,222,128,0.06)' : 'rgba(239,68,68,0.04)'}; border: 1px solid ${isWatched ? 'rgba(74,222,128,0.2)' : 'rgba(239,68,68,0.15)'}; border-radius: 0.45rem; gap: 0.5rem;">
+                        <div style="font-size: 0.88rem; font-weight: 600; color: var(--text-primary); text-align: left; flex: 1; line-height: 1.35;">
                             <div>${video.title}</div>
                             ${isWatched ? `
                                 <div style="font-size: 0.75rem; font-weight: normal; color: var(--text-secondary); margin-top: 2px;">
@@ -1647,10 +1721,20 @@ function showParticipantDetails(userKey) {
                                 </div>
                             ` : ''}
                         </div>
-                        <div style="flex-shrink: 0;">
+                        <div style="flex-shrink: 0; display: flex; align-items: center; gap: 0.4rem;">
                             ${isWatched 
-                                ? `<span style="color: var(--success); font-weight: 700; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 0.2rem;"><i data-lucide="check-circle" style="width:14px; height:14px;"></i> ชมแล้ว</span>` 
-                                : `<span style="color: var(--red); font-weight: 700; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 0.2rem;"><i data-lucide="x-circle" style="width:14px; height:14px;"></i> ยังไม่ชม</span>`
+                                ? `
+                                    <span style="color: var(--success); font-weight: 700; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 0.2rem;"><i data-lucide="check-circle" style="width:14px; height:14px;"></i> ชมแล้ว</span>
+                                    <button class="btn btn-outline" style="padding: 0.25rem 0.5rem; font-size: 0.72rem; color: var(--text-secondary); border-color: #cbd5e1;" onclick="adminToggleWatch('${safeEmpId}', '${safeName}', '${safeEmpType}', '${safeVideoId}', 'unmark', '${encodeURIComponent(userKey)}')">
+                                        ยกเลิกสถานะ
+                                    </button>
+                                  ` 
+                                : `
+                                    <span style="color: var(--red); font-weight: 700; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 0.2rem;"><i data-lucide="x-circle" style="width:14px; height:14px;"></i> ยังไม่ชม</span>
+                                    <button class="btn btn-emerald" style="padding: 0.25rem 0.55rem; font-size: 0.72rem;" onclick="adminToggleWatch('${safeEmpId}', '${safeName}', '${safeEmpType}', '${safeVideoId}', 'mark', '${encodeURIComponent(userKey)}')">
+                                        <i data-lucide="check" style="width:12px; height:12px;"></i> บันทึกว่าชมแล้ว
+                                    </button>
+                                  `
                             }
                         </div>
                     </div>
@@ -1662,6 +1746,70 @@ function showParticipantDetails(userKey) {
     // Show Modal
     document.getElementById("participant-detail-modal").classList.remove("hidden");
     lucide.createIcons();
+}
+
+async function adminToggleWatch(encodedEmpId, encodedName, encodedEmpType, encodedVideoId, action, encodedUserKey) {
+    const empId = decodeURIComponent(encodedEmpId);
+    const name = decodeURIComponent(encodedName);
+    const emptype = decodeURIComponent(encodedEmpType);
+    const videoId = decodeURIComponent(encodedVideoId);
+    const userKey = decodeURIComponent(encodedUserKey);
+
+    if (!isOnlineDb) {
+        const p = participants.find(item => (item.empId && item.empId === userKey) || (!item.empId && item.name === userKey));
+        if (p) {
+            if (!p.watched) p.watched = [];
+            if (!p.watchedAt) p.watchedAt = {};
+            const now = new Date();
+            const timeStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+            if (action === "unmark") {
+                p.watched = p.watched.filter(id => id !== videoId);
+                delete p.watchedAt[videoId];
+            } else {
+                if (!p.watched.includes(videoId)) p.watched.push(videoId);
+                p.watchedAt[videoId] = timeStr;
+            }
+            watchedLogs[userKey] = p.watched;
+            localStorage.setItem(DB_USERS_KEY, JSON.stringify(participants));
+            localStorage.setItem(DB_WATCHED_KEY, JSON.stringify(watchedLogs));
+            showToast("อัปเดตสถานะการรับชมเรียบร้อย");
+            showParticipantDetails(userKey);
+            renderAdminDashboard();
+        }
+        return;
+    }
+
+    try {
+        const res = await fetch("/api/admin-toggle-watch", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "x-admin-password": encodeURIComponent(adminPassword)
+            },
+            body: JSON.stringify({ empId, name, emptype, videoId, action })
+        });
+        const data = await res.json();
+        if (res.ok && data.ok && data.user) {
+            const idx = participants.findIndex(p => (p.empId && p.empId.toUpperCase() === empId.toUpperCase()) || (!p.empId && normalizeName(p.name) === normalizeName(name)));
+            if (idx !== -1) {
+                participants[idx] = data.user;
+            } else {
+                participants.push(data.user);
+            }
+            watchedLogs[userKey] = data.user.watched || [];
+            localStorage.setItem(DB_USERS_KEY, JSON.stringify(participants));
+            localStorage.setItem(DB_WATCHED_KEY, JSON.stringify(watchedLogs));
+
+            showToast(action === "unmark" ? "ยกเลิกสถานะการรับชมแล้ว" : "บันทึกสถานะว่ารับชมแล้วเรียบร้อย! 🎉");
+            showParticipantDetails(userKey);
+            renderAdminDashboard();
+        } else {
+            showToast(data.error || "เกิดข้อผิดพลาดในการบันทึก", true);
+        }
+    } catch (e) {
+        console.error("Failed to admin toggle watch:", e);
+        showToast("เชื่อมต่อระบบไม่สำเร็จ", true);
+    }
 }
 
 function closeParticipantDetailModal() {
@@ -2211,3 +2359,17 @@ function showLoginSuggestions(inputName, selectedEmptype) {
         suggestionsContainer.classList.add("hidden");
     }
 }
+
+// Auto-record watch history when YouTube iframe ends
+window.addEventListener("message", function (event) {
+    try {
+        const data = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
+        if (data && data.event === "infoDelivery" && data.info && data.info.playerState === 0) {
+            if (currentPlayingVideo) {
+                markCurrentVideoWatched();
+                showToast("รับชมคลิป YouTube จบแล้ว ระบบบันทึกประวัติให้คุณอัตโนมัติ 🎉");
+            }
+        }
+    } catch (e) {}
+});
+

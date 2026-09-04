@@ -9,8 +9,11 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "ข้อมูลสำหรับบันทึกการรับชมไม่ครบถ้วน" });
   }
 
+  const cleanEmpId = empId ? String(empId).trim().toUpperCase() : "";
+  const cleanName = String(name || "").trim();
+
   try {
-    let user = await findParticipant({ emptype, name, empId });
+    let user = await findParticipant({ emptype, name: cleanName, empId: cleanEmpId });
 
     const now = new Date();
     const tzOffset = 7 * 60; // mins
@@ -20,9 +23,9 @@ export default async function handler(req, res) {
     if (!user) {
       // Auto-recover/auto-create missing participant record on cloud so no watch history is ever lost!
       user = {
-        emptype,
-        empId: empId || "",
-        name: String(name).trim(),
+        emptype: emptype || "พนักงาน",
+        empId: cleanEmpId,
+        name: cleanName,
         dept: (dept || "อื่นๆ").trim(),
         regTime: regTime || formattedDate,
         watched: [videoId],
@@ -46,6 +49,11 @@ export default async function handler(req, res) {
 
     if (!user.watchedAt[videoId]) {
       user.watchedAt[videoId] = formattedDate;
+    }
+
+    // Also update empId if was missing
+    if (cleanEmpId && (!user.empId || user.empId === "")) {
+      user.empId = cleanEmpId;
     }
 
     // Also update dept if provided and missing

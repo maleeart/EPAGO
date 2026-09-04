@@ -2,40 +2,12 @@ import { put, list, del } from "@vercel/blob";
 
 const PREFIX = "epago/participants/";
 
-export function getStoreDomain() {
-  const storeId = process.env.BLOB_STORE_ID;
-  if (storeId) {
-    return `${storeId}.public.blob.vercel-storage.com`;
-  }
-  const token = process.env.BLOB_READ_WRITE_TOKEN;
-  if (token) {
-    const parts = token.split("_");
-    if (parts.length >= 4) {
-      return `${parts[3]}.public.blob.vercel-storage.com`;
-    }
-  }
-  return null;
-}
-
 export async function readParticipant(key) {
   checkToken();
-  const domain = getStoreDomain();
-  if (domain) {
-    const url = `https://${domain}/${PREFIX}${key}.json?t=${Date.now()}`;
-    try {
-      const res = await fetch(url);
-      if (res.ok) {
-        return await res.json();
-      }
-    } catch (e) {
-      // ignore, fall through to list fallback
-    }
-  }
-
   try {
-    const { blobs } = await list({ prefix: `${PREFIX}${key}` });
-    if (blobs && blobs.length > 0) {
-      const b = blobs[0];
+    const { blobs } = await list({ prefix: `${PREFIX}${key}.json` });
+    const b = blobs && blobs.find(item => item.pathname === `${PREFIX}${key}.json`) || (blobs && blobs[0]);
+    if (b) {
       const data = await fetch(`${b.url}?t=${Date.now()}`).then(r => r.json());
       return { ...data, _blobUrl: b.url };
     }
@@ -56,8 +28,9 @@ export const normalizeName = name => {
 const safeStr = s => (s || "").replace(/\s+/g, "_").replace(/[^\w฀-๿]/g, "").slice(0, 40);
 
 export function getBlobKey(user) {
-  if (user && user.empId) {
-    return `emp-${String(user.empId).replace(/[^a-zA-Z0-9]/g, "_")}`;
+  const empId = user && user.empId ? String(user.empId).trim().toUpperCase() : "";
+  if (empId) {
+    return `emp-${empId.replace(/[^a-zA-Z0-9]/g, "_")}`;
   } else {
     return `contractor-${safeStr(normalizeName(user ? user.name : ""))}`;
   }
@@ -65,19 +38,29 @@ export function getBlobKey(user) {
 
 export async function findParticipant({ emptype, name, empId }) {
   checkToken();
-  const key = getBlobKey({ emptype, name, empId });
-  let user = await readParticipant(key);
-  if (user) return user;
+  const cleanEmpId = empId ? String(empId).trim().toUpperCase() : "";
+  const cleanName = normalizeName(name);
 
-  // Ultimate fallback: scan all participants to be 100% resilient
+  // 1. Try direct lookup by key if empId is given
+  if (cleanEmpId) {
+    const user = await readParticipant(`emp-${cleanEmpId.replace(/[^a-zA-Z0-9]/g, "_")}`);
+    if (user) return user;
+  }
+  // 2. Try contractor key if name is given
+  if (cleanName) {
+    const user = await readParticipant(`contractor-${safeStr(cleanName)}`);
+    if (user) return user;
+  }
+
+  // 3. Fallback: scan all participants to guarantee matching
   try {
     const all = await readAllParticipants();
-    const normalizedInput = normalizeName(name);
     return all.find(p => {
-      if (empId && p.empId) {
-        return String(p.empId).toUpperCase() === String(empId).toUpperCase();
+      const pEmpId = p.empId ? String(p.empId).trim().toUpperCase() : "";
+      if (cleanEmpId && pEmpId && pEmpId === cleanEmpId) {
+        return true;
       }
-      return normalizeName(p.name) === normalizedInput;
+      return cleanName && normalizeName(p.name) === cleanName;
     }) || null;
   } catch (e) {
     console.error("findParticipant fallback error:", e);
