@@ -1,6 +1,6 @@
 import { readVideos, saveVideos } from "./_blob.js";
 
-export const CURRENT_VIDEOS_VERSION = "v1.9";
+export const CURRENT_VIDEOS_VERSION = "v2.0";
 
 const DEFAULT_VIDEOS = [
   {

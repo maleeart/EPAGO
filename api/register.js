@@ -1,4 +1,4 @@
-import { getBlobKey, readParticipant, saveParticipant } from "./_blob.js";
+import { findParticipant, saveParticipant } from "./_blob.js";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "method not allowed" });
@@ -14,8 +14,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const key = getBlobKey({ emptype, name, empId });
-    const existing = await readParticipant(key);
+    const existing = await findParticipant({ emptype, name, empId });
 
     const bodyWatched = Array.isArray(req.body.watched) ? req.body.watched : [];
     const watchedList = existing 

@@ -1,4 +1,4 @@
-import { getBlobKey, readParticipant } from "./_blob.js";
+import { findParticipant } from "./_blob.js";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "method not allowed" });
@@ -14,8 +14,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const key = getBlobKey({ emptype, name, empId });
-    const user = await readParticipant(key);
+    const user = await findParticipant({ emptype, name, empId });
 
     if (user) {
       res.status(200).json({ ok: true, user });

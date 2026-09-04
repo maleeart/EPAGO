@@ -295,10 +295,11 @@ async function syncCurrentUserWatchedProgress() {
             body: JSON.stringify({
                 emptype: currentUser.emptype,
                 name: currentUser.name,
-                empId: currentUser.empId
+                empId: currentUser.empId,
+                dept: currentUser.dept
             })
         });
-        const resData = await response.json();
+        const resData = await response.json().catch(() => ({}));
         if (response.ok && resData.ok && resData.user) {
             currentUser = resData.user;
             localStorage.setItem(DB_CURRENT_USER_KEY, JSON.stringify(currentUser));
@@ -306,6 +307,32 @@ async function syncCurrentUserWatchedProgress() {
             watchedLogs[userKey] = currentUser.watched || [];
             localStorage.setItem(DB_WATCHED_KEY, JSON.stringify(watchedLogs));
             renderUserLobby();
+        } else if (response.status === 404 && isOnlineDb) {
+            // Auto-heal: If user exists locally but was lost/unrecorded on cloud, sync to cloud now
+            const userKey = currentUser.empId || currentUser.name;
+            const watched = currentUser.watched || watchedLogs[userKey] || [];
+            const regRes = await fetch("/api/register", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    emptype: currentUser.emptype,
+                    empId: currentUser.empId || "",
+                    name: currentUser.name,
+                    dept: currentUser.dept,
+                    regTime: currentUser.regTime,
+                    watched: watched
+                })
+            }).catch(e => null);
+            if (regRes && regRes.ok) {
+                const regData = await regRes.json();
+                if (regData && regData.user) {
+                    currentUser = regData.user;
+                    localStorage.setItem(DB_CURRENT_USER_KEY, JSON.stringify(currentUser));
+                    watchedLogs[userKey] = currentUser.watched || [];
+                    localStorage.setItem(DB_WATCHED_KEY, JSON.stringify(watchedLogs));
+                    renderUserLobby();
+                }
+            }
         }
     } catch (e) {
         console.warn("Failed to sync current user watch progress:", e);
@@ -384,7 +411,7 @@ async function migrateLocalDataToCloud() {
 // Seed data storage if empty
 function initDatabase() {
     // Database Versioning / Force Reset for default videos
-    const DB_VERSION = "v1.9";
+    const DB_VERSION = "v2.0";
     if (localStorage.getItem("db_version") !== DB_VERSION) {
         localStorage.setItem(DB_VIDEOS_KEY, JSON.stringify(DEFAULT_VIDEOS));
         localStorage.setItem("db_version", DB_VERSION);
@@ -1129,6 +1156,8 @@ async function markCurrentVideoWatched() {
                     emptype: currentUser.emptype,
                     name: currentUser.name,
                     empId: currentUser.empId,
+                    dept: currentUser.dept,
+                    regTime: currentUser.regTime,
                     videoId: videoId
                 })
             });

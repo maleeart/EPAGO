@@ -20,41 +20,68 @@ export function getStoreDomain() {
 export async function readParticipant(key) {
   checkToken();
   const domain = getStoreDomain();
-  if (!domain) {
-    const { blobs } = await list({ prefix: `${PREFIX}${key}.json` });
-    if (blobs && blobs.length > 0) {
-      return await fetch(`${blobs[0].url}?t=${Date.now()}`).then(r => r.json());
+  if (domain) {
+    const url = `https://${domain}/${PREFIX}${key}.json?t=${Date.now()}`;
+    try {
+      const res = await fetch(url);
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch (e) {
+      // ignore, fall through to list fallback
     }
-    return null;
   }
-  const url = `https://${domain}/${PREFIX}${key}.json?t=${Date.now()}`;
+
   try {
-    const res = await fetch(url);
-    if (res.ok) {
-      return await res.json();
+    const { blobs } = await list({ prefix: `${PREFIX}${key}` });
+    if (blobs && blobs.length > 0) {
+      const b = blobs[0];
+      const data = await fetch(`${b.url}?t=${Date.now()}`).then(r => r.json());
+      return { ...data, _blobUrl: b.url };
     }
-    return null;
   } catch (e) {
-    console.error(`Failed to read direct participant:`, e);
-    return null;
+    console.error("Failed to read participant via list:", e);
   }
+  return null;
 }
 
 // Helper to normalize contractor names to strip spaces and symbols for clean blob filenames
-const normalizeName = name => {
+export const normalizeName = name => {
   if (!name) return "";
-  return name.trim()
+  return String(name).trim()
     .replace(/^(นาย|นางสาว|นาง|ด\.ช\.|ด\.ญ\.|นายแพทย์|แพทย์หญิง|ดร\.)\s*/, "")
     .replace(/\s+/g, "");
 };
 
-const safeStr = s => s.replace(/\s+/g, "_").replace(/[^\w฀-๿]/g, "").slice(0, 40);
+const safeStr = s => (s || "").replace(/\s+/g, "_").replace(/[^\w฀-๿]/g, "").slice(0, 40);
 
 export function getBlobKey(user) {
-  if (user.empId) {
+  if (user && user.empId) {
     return `emp-${String(user.empId).replace(/[^a-zA-Z0-9]/g, "_")}`;
   } else {
-    return `contractor-${safeStr(normalizeName(user.name))}-${safeStr(user.dept)}`;
+    return `contractor-${safeStr(normalizeName(user ? user.name : ""))}`;
+  }
+}
+
+export async function findParticipant({ emptype, name, empId }) {
+  checkToken();
+  const key = getBlobKey({ emptype, name, empId });
+  let user = await readParticipant(key);
+  if (user) return user;
+
+  // Ultimate fallback: scan all participants to be 100% resilient
+  try {
+    const all = await readAllParticipants();
+    const normalizedInput = normalizeName(name);
+    return all.find(p => {
+      if (empId && p.empId) {
+        return String(p.empId).toUpperCase() === String(empId).toUpperCase();
+      }
+      return normalizeName(p.name) === normalizedInput;
+    }) || null;
+  } catch (e) {
+    console.error("findParticipant fallback error:", e);
+    return null;
   }
 }
 
