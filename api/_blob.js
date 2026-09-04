@@ -28,7 +28,7 @@ export const normalizeName = name => {
 const safeStr = s => (s || "").replace(/\s+/g, "_").replace(/[^\w฀-๿]/g, "").slice(0, 40);
 
 export function getBlobKey(user) {
-  const empId = user && user.empId ? String(user.empId).trim().toUpperCase() : "";
+  const empId = user && user.empId && user.empId !== "-" ? String(user.empId).trim().toUpperCase() : "";
   if (empId) {
     return `emp-${empId.replace(/[^a-zA-Z0-9]/g, "_")}`;
   } else {
@@ -38,7 +38,7 @@ export function getBlobKey(user) {
 
 export async function findParticipant({ emptype, name, empId }) {
   checkToken();
-  const cleanEmpId = empId ? String(empId).trim().toUpperCase() : "";
+  const cleanEmpId = empId && empId !== "-" ? String(empId).trim().toUpperCase() : "";
   const cleanName = normalizeName(name);
 
   // 1. Try direct lookup by key if empId is given
@@ -56,7 +56,7 @@ export async function findParticipant({ emptype, name, empId }) {
   try {
     const all = await readAllParticipants();
     return all.find(p => {
-      const pEmpId = p.empId ? String(p.empId).trim().toUpperCase() : "";
+      const pEmpId = p.empId && p.empId !== "-" ? String(p.empId).trim().toUpperCase() : "";
       if (cleanEmpId && pEmpId && pEmpId === cleanEmpId) {
         return true;
       }
@@ -77,11 +77,20 @@ function checkToken() {
 export async function saveParticipant(data) {
   checkToken();
   const key = getBlobKey(data);
-  return await put(`${PREFIX}${key}.json`, JSON.stringify(data), {
+  const result = await put(`${PREFIX}${key}.json`, JSON.stringify(data), {
     access: "public",
     addRandomSuffix: false,
     allowOverwrite: true,
   });
+
+  // If data migrated from a legacy/different blob URL, delete the old file to prevent duplicates
+  if (data._blobUrl && data._blobUrl !== result.url) {
+    try {
+      await del(data._blobUrl).catch(e => console.warn("Failed to delete legacy blob:", e));
+    } catch (e) {}
+  }
+
+  return result;
 }
 
 export async function readAllParticipants() {
@@ -99,7 +108,67 @@ export async function readAllParticipants() {
     }
   }));
   
-  return rows.filter(r => r !== null).sort((a, b) => b.regTime.localeCompare(a.regTime));
+  const validRows = rows.filter(r => r !== null && r.name);
+
+  // Deduplicate and merge participants by unique identity
+  const map = new Map();
+  const duplicateBlobUrlsToDelete = [];
+
+  for (const user of validRows) {
+    const cleanEmpId = (user.empId && user.empId !== "-") ? String(user.empId).trim().toUpperCase() : "";
+    const cleanName = normalizeName(user.name);
+    // Identity key: empId for employees, or normalized name for contractors
+    const identityKey = cleanEmpId ? `emp:${cleanEmpId}` : `contractor:${cleanName}`;
+
+    if (!map.has(identityKey)) {
+      map.set(identityKey, user);
+    } else {
+      // Duplicate found! Merge records into one canonical record
+      const existing = map.get(identityKey);
+      
+      const mergedWatched = Array.from(new Set([...(existing.watched || []), ...(user.watched || [])]));
+      const mergedWatchedAt = { ...(user.watchedAt || {}), ...(existing.watchedAt || {}) };
+      
+      const earlierRegTime = (existing.regTime && user.regTime)
+        ? (existing.regTime < user.regTime ? existing.regTime : user.regTime)
+        : (existing.regTime || user.regTime || "");
+
+      const canonicalKey = getBlobKey(existing);
+      const isUserCanonical = user._blobUrl && user._blobUrl.includes(`/${canonicalKey}.json`);
+      const isExistingCanonical = existing._blobUrl && existing._blobUrl.includes(`/${canonicalKey}.json`);
+
+      if (isUserCanonical && !isExistingCanonical) {
+        if (existing._blobUrl) duplicateBlobUrlsToDelete.push(existing._blobUrl);
+        existing._blobUrl = user._blobUrl;
+      } else {
+        if (user._blobUrl && user._blobUrl !== existing._blobUrl) {
+          duplicateBlobUrlsToDelete.push(user._blobUrl);
+        }
+      }
+
+      existing.watched = mergedWatched;
+      existing.watchedAt = mergedWatchedAt;
+      existing.regTime = earlierRegTime;
+      if (!existing.dept || existing.dept === "อื่นๆ") {
+        existing.dept = user.dept || existing.dept;
+      }
+      if (cleanEmpId && (!existing.empId || existing.empId === "-")) {
+        existing.empId = cleanEmpId;
+      }
+    }
+  }
+
+  // Asynchronously clean up duplicate legacy blobs in the background
+  if (duplicateBlobUrlsToDelete.length > 0) {
+    try {
+      await del(duplicateBlobUrlsToDelete).catch(err => console.warn("Failed to delete duplicate blobs:", err));
+    } catch (e) {
+      console.warn("Error cleaning duplicate blobs:", e);
+    }
+  }
+
+  const result = Array.from(map.values());
+  return result.sort((a, b) => b.regTime.localeCompare(a.regTime));
 }
 
 export async function removeParticipant(url) {

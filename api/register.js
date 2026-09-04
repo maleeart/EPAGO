@@ -13,22 +13,30 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "กรุณาระบุรหัสพนักงาน" });
   }
 
+  const cleanEmpId = (empId && empId !== "-") ? String(empId).trim().toUpperCase() : "";
+
   try {
-    const existing = await findParticipant({ emptype, name, empId });
+    const existing = await findParticipant({ emptype, name, empId: cleanEmpId });
 
     const bodyWatched = Array.isArray(req.body.watched) ? req.body.watched : [];
     const watchedList = existing 
       ? Array.from(new Set([...(existing.watched || []), ...bodyWatched]))
       : bodyWatched;
     
+    const watchedAt = {
+      ...(existing && existing.watchedAt ? existing.watchedAt : {}),
+      ...(req.body.watchedAt ? req.body.watchedAt : {})
+    };
+
     const data = {
       emptype,
-      empId: empId || "",
+      empId: cleanEmpId,
       name: name.trim(),
       dept: dept.trim(),
-      regTime,
+      regTime: (existing && existing.regTime) ? existing.regTime : regTime,
       watched: watchedList,
-      watchedAt: existing ? (existing.watchedAt || {}) : {}
+      watchedAt: watchedAt,
+      _blobUrl: existing ? existing._blobUrl : undefined
     };
 
     const result = await saveParticipant(data);

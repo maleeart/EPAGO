@@ -5,7 +5,7 @@
     <script>
         // Force database reset on version mismatch (inline to ensure it runs immediately)
         (function() {
-            var CURRENT_VERSION = "v2.1";
+            var CURRENT_VERSION = "v2.2";
             if (localStorage.getItem("db_version") !== CURRENT_VERSION) {
                 localStorage.removeItem("energysave_videos");
                 localStorage.setItem("db_version", CURRENT_VERSION);
@@ -604,6 +604,6 @@
             lucide.createIcons();
         });
     </script>
-    <script src="app.js?v=2.1"></script>
+    <script src="app.js?v=2.2"></script>
 </body>
 </html>

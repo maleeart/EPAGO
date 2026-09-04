@@ -441,7 +441,7 @@ async function migrateLocalDataToCloud() {
 // Seed data storage if empty
 function initDatabase() {
     // Database Versioning / Force Reset for default videos
-    const DB_VERSION = "v2.1";
+    const DB_VERSION = "v2.2";
     if (localStorage.getItem("db_version") !== DB_VERSION) {
         localStorage.setItem(DB_VIDEOS_KEY, JSON.stringify(DEFAULT_VIDEOS));
         localStorage.setItem("db_version", DB_VERSION);
@@ -614,12 +614,11 @@ async function handleRegistration(e) {
     // Check if participant already exists in logs (using normalized name for contractors, robust for older schemas)
     const normalizedRegName = normalizeName(name);
     const existingIndex = participants.findIndex(p => {
-        if (empId) {
+        if (empId && empId !== "-") {
             return p.empId && p.empId.toUpperCase() === empId.toUpperCase();
         } else {
-            const dbHasNoId = !p.empId || p.empId === "";
-            const typeMatches = !p.emptype || p.emptype === "ลูกจ้าง";
-            return dbHasNoId && typeMatches && normalizeName(p.name) === normalizedRegName;
+            const dbHasNoId = !p.empId || p.empId === "" || p.empId === "-";
+            return dbHasNoId && normalizeName(p.name) === normalizedRegName;
         }
     });
 
@@ -645,9 +644,23 @@ async function handleRegistration(e) {
                 } else {
                     participants[existingIndex] = serverUser;
                 }
+
+                // Filter duplicates in local state
+                const seenMap = new Map();
+                participants.forEach(p => {
+                    const k = (p.empId && p.empId !== "-") ? `emp:${p.empId.toUpperCase()}` : `contractor:${normalizeName(p.name)}`;
+                    if (!seenMap.has(k)) {
+                        seenMap.set(k, p);
+                    } else {
+                        const ex = seenMap.get(k);
+                        ex.watched = Array.from(new Set([...(ex.watched || []), ...(p.watched || [])]));
+                        ex.watchedAt = { ...(p.watchedAt || {}), ...(ex.watchedAt || {}) };
+                    }
+                });
+                participants = Array.from(seenMap.values());
                 localStorage.setItem(DB_USERS_KEY, JSON.stringify(participants));
                 
-                const userKey = empId || name;
+                const userKey = (empId && empId !== "-") ? empId : name;
                 watchedLogs[userKey] = serverUser.watched || [];
                 localStorage.setItem(DB_WATCHED_KEY, JSON.stringify(watchedLogs));
                 
@@ -839,12 +852,11 @@ async function handleReturningLogin(e) {
                 
                 // Add to local participants if missing
                 const existingIndex = participants.findIndex(p => {
-                    if (currentUser.empId) {
+                    if (currentUser.empId && currentUser.empId !== "-") {
                         return p.empId && p.empId.toUpperCase() === currentUser.empId.toUpperCase();
                     } else {
-                        const dbHasNoId = !p.empId || p.empId === "";
-                        const typeMatches = !p.emptype || p.emptype === "ลูกจ้าง";
-                        return dbHasNoId && typeMatches && normalizeName(p.name) === normalizedInputName;
+                        const dbHasNoId = !p.empId || p.empId === "" || p.empId === "-";
+                        return dbHasNoId && normalizeName(p.name) === normalizedInputName;
                     }
                 });
                 if (existingIndex === -1) {
@@ -852,6 +864,20 @@ async function handleReturningLogin(e) {
                 } else {
                     participants[existingIndex] = currentUser;
                 }
+
+                // Deduplicate in local state
+                const seenMap = new Map();
+                participants.forEach(p => {
+                    const k = (p.empId && p.empId !== "-") ? `emp:${p.empId.toUpperCase()}` : `contractor:${normalizeName(p.name)}`;
+                    if (!seenMap.has(k)) {
+                        seenMap.set(k, p);
+                    } else {
+                        const ex = seenMap.get(k);
+                        ex.watched = Array.from(new Set([...(ex.watched || []), ...(p.watched || [])]));
+                        ex.watchedAt = { ...(p.watchedAt || {}), ...(ex.watchedAt || {}) };
+                    }
+                });
+                participants = Array.from(seenMap.values());
                 localStorage.setItem(DB_USERS_KEY, JSON.stringify(participants));
                 
                 showToast(`ยินดีต้อนรับกลับมาครับ คุณ${currentUser.name} 🌱`);
@@ -1319,12 +1345,27 @@ async function fetchOnlineParticipants() {
         });
         const resData = await response.json();
         if (response.ok && resData.ok) {
-            participants = resData.participants || [];
+            const raw = resData.participants || [];
+            
+            // Deduplicate to guarantee no duplicates in local state
+            const seenMap = new Map();
+            raw.forEach(p => {
+                const cleanEmpId = (p.empId && p.empId !== "-") ? String(p.empId).trim().toUpperCase() : "";
+                const key = cleanEmpId ? `emp:${cleanEmpId}` : `contractor:${normalizeName(p.name)}`;
+                if (!seenMap.has(key)) {
+                    seenMap.set(key, p);
+                } else {
+                    const ex = seenMap.get(key);
+                    ex.watched = Array.from(new Set([...(ex.watched || []), ...(p.watched || [])]));
+                    ex.watchedAt = { ...(p.watchedAt || {}), ...(ex.watchedAt || {}) };
+                }
+            });
+            participants = Array.from(seenMap.values());
             
             // Recompile local watchedLogs mapping
             watchedLogs = {};
             participants.forEach(p => {
-                const userKey = p.empId || p.name;
+                const userKey = (p.empId && p.empId !== "-") ? p.empId : p.name;
                 watchedLogs[userKey] = p.watched || [];
             });
             
@@ -1369,8 +1410,16 @@ function switchAdminTab(tabName) {
 }
 
 function renderAdminDashboard() {
-    // Calculate total stats
-    const totalParticipants = participants.length;
+    // Calculate total stats with unique count
+    const uniqueMap = new Map();
+    participants.forEach(p => {
+        const cleanEmpId = (p.empId && p.empId !== "-") ? String(p.empId).trim().toUpperCase() : "";
+        const key = cleanEmpId ? `emp:${cleanEmpId}` : `contractor:${normalizeName(p.name)}`;
+        if (!uniqueMap.has(key)) {
+            uniqueMap.set(key, p);
+        }
+    });
+    const totalParticipants = uniqueMap.size;
     const totalVideos = videos.length;
     
     let totalViews = 0;
@@ -1416,9 +1465,21 @@ function renderAffiliationRegistrationSummary() {
     // Total count of videos in system
     const totalVideosCount = videos.length;
     
-    // Process each participant
-    participants.forEach(user => {
-        const userKey = user.empId || user.name;
+    // Process each unique participant
+    const uniqueMap = new Map();
+    participants.forEach(p => {
+        const cleanEmpId = (p.empId && p.empId !== "-") ? String(p.empId).trim().toUpperCase() : "";
+        const key = cleanEmpId ? `emp:${cleanEmpId}` : `contractor:${normalizeName(p.name)}`;
+        if (!uniqueMap.has(key)) {
+            uniqueMap.set(key, { ...p });
+        } else {
+            const ex = uniqueMap.get(key);
+            ex.watched = Array.from(new Set([...(ex.watched || []), ...(p.watched || [])]));
+        }
+    });
+
+    Array.from(uniqueMap.values()).forEach(user => {
+        const userKey = (user.empId && user.empId !== "-") ? user.empId : user.name;
         const userWatched = (user && Array.isArray(user.watched) && user.watched.length > 0) ? user.watched : (watchedLogs[userKey] || []);
         const watchedCount = userWatched.filter(id => videos.some(v => v.id === id)).length;
         
@@ -1578,11 +1639,24 @@ function renderAdminParticipantsTable() {
         return;
     }
     
-    // Sort by registration time descending (newest first)
-    const sortedParticipants = [...filteredParticipants].sort((a,b) => b.regTime.localeCompare(a.regTime));
+    // Deduplicate filtered participants before sorting & rendering so duplicate records never display
+    const seenMap = new Map();
+    filteredParticipants.forEach(p => {
+        const cleanEmpId = (p.empId && p.empId !== "-") ? String(p.empId).trim().toUpperCase() : "";
+        const key = cleanEmpId ? `emp:${cleanEmpId}` : `contractor:${normalizeName(p.name)}`;
+        if (!seenMap.has(key)) {
+            seenMap.set(key, { ...p });
+        } else {
+            const ex = seenMap.get(key);
+            ex.watched = Array.from(new Set([...(ex.watched || []), ...(p.watched || [])]));
+            ex.watchedAt = { ...(p.watchedAt || {}), ...(ex.watchedAt || {}) };
+        }
+    });
+    const uniqueParticipants = Array.from(seenMap.values());
+    const sortedParticipants = uniqueParticipants.sort((a,b) => b.regTime.localeCompare(a.regTime));
     
     sortedParticipants.forEach(user => {
-        const userKey = user.empId || user.name;
+        const userKey = (user.empId && user.empId !== "-") ? user.empId : user.name;
         const userWatched = (user && Array.isArray(user.watched) && user.watched.length > 0) ? user.watched : (watchedLogs[userKey] || []);
         const totalCount = videos.length;
         const watchedCount = userWatched.filter(id => videos.some(v => v.id === id)).length;
@@ -1632,6 +1706,20 @@ function renderAffiliationVideoStats() {
         return p.dept === selectedUnit;
     });
     
+    // Deduplicate to guarantee accurate stats
+    const uniqueMap = new Map();
+    filteredUsers.forEach(p => {
+        const cleanEmpId = (p.empId && p.empId !== "-") ? String(p.empId).trim().toUpperCase() : "";
+        const key = cleanEmpId ? `emp:${cleanEmpId}` : `contractor:${normalizeName(p.name)}`;
+        if (!uniqueMap.has(key)) {
+            uniqueMap.set(key, { ...p });
+        } else {
+            const ex = uniqueMap.get(key);
+            ex.watched = Array.from(new Set([...(ex.watched || []), ...(p.watched || [])]));
+        }
+    });
+    const uniqueFilteredUsers = Array.from(uniqueMap.values());
+    
     if (videos.length === 0) {
         tbody.innerHTML = `
             <tr>
@@ -1646,8 +1734,8 @@ function renderAffiliationVideoStats() {
     videos.forEach(video => {
         // Count how many of these filtered participants watched this video
         let watchedCount = 0;
-        filteredUsers.forEach(user => {
-            const userKey = user.empId || user.name;
+        uniqueFilteredUsers.forEach(user => {
+            const userKey = (user.empId && user.empId !== "-") ? user.empId : user.name;
             const watched = (user && Array.isArray(user.watched) && user.watched.length > 0) ? user.watched : (watchedLogs[userKey] || []);
             if (watched.includes(video.id)) {
                 watchedCount++;
@@ -1659,7 +1747,7 @@ function renderAffiliationVideoStats() {
             <td><strong style="color: var(--blue-d);">${video.title}</strong></td>
             <td style="white-space: nowrap;"><span class="category-pill" style="font-size: 0.75rem; padding: 0.15rem 0.4rem; white-space: nowrap;">${video.category}</span></td>
             <td style="text-align: center; font-weight: 700; font-family: 'Outfit', sans-serif; color: var(--blue); white-space: nowrap;">
-                ${watchedCount} / ${filteredUsers.length} คน
+                ${watchedCount} / ${uniqueFilteredUsers.length} คน
             </td>
         `;
         tbody.appendChild(tr);
