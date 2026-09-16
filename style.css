@@ -1327,3 +1327,154 @@ body.admin-mode .hero-banner {
         padding: 0.6rem 10px;
     }
 }
+
+/* Headcount Configuration */
+.headcount-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 1.25rem;
+    margin-bottom: 1.5rem;
+}
+
+.headcount-card {
+    background: #ffffff;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 1.1rem 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    transition: all var(--transition-fast);
+}
+
+.headcount-card:hover {
+    border-color: var(--blue);
+    box-shadow: 0 4px 12px rgba(27,76,158,0.1);
+}
+
+.headcount-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.headcount-unit-name {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--blue-d);
+}
+
+.headcount-input-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.headcount-input-wrapper input {
+    flex: 1;
+    font-family: 'Outfit', var(--font-family);
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--blue-d);
+    text-align: right;
+    padding: 0.5rem 0.75rem;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 8px;
+    outline: none;
+    transition: border-color var(--transition-fast);
+}
+
+.headcount-input-wrapper input:focus {
+    border-color: var(--blue);
+    box-shadow: 0 0 0 3px rgba(27,76,158,0.15);
+}
+
+.headcount-unit-suffix {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+/* Evaluation Badges */
+.badge-eval {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.3rem 0.65rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.badge-eval-high {
+    background-color: #dcfce7;
+    color: #15803d;
+    border: 1px solid #86efac;
+}
+
+.badge-eval-med {
+    background-color: #fef3c7;
+    color: #b45309;
+    border: 1px solid #fde68a;
+}
+
+.badge-eval-low {
+    background-color: #fee2e2;
+    color: #b91c1c;
+    border: 1px solid #fca5a5;
+}
+
+.badge-eval-none {
+    background-color: #f1f5f9;
+    color: #64748b;
+    border: 1px solid #e2e8f0;
+}
+
+/* Mini Progress Bar for Table */
+.table-mini-progress {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 90px;
+}
+
+.table-mini-progress-pct {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 700;
+    font-size: 0.85rem;
+    min-width: 42px;
+    text-align: right;
+}
+
+.table-mini-progress-track {
+    flex: 1;
+    height: 7px;
+    background-color: #e2e8f0;
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.table-mini-progress-fill {
+    height: 100%;
+    border-radius: 999px;
+    transition: width 0.3s ease;
+}
+
+.table-mini-progress-fill.high {
+    background-color: #10b981;
+}
+
+.table-mini-progress-fill.med {
+    background-color: #f59e0b;
+}
+
+.table-mini-progress-fill.low {
+    background-color: #ef4444;
+}
+
+.table-mini-progress-fill.none {
+    background-color: #cbd5e1;
+}
+

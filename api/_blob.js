@@ -209,3 +209,29 @@ export async function readVideos() {
     return null;
   }
 }
+
+// --- Headcount Settings API Helpers ---
+const HEADCOUNT_BLOB_PATH = "epago/headcount.json";
+
+export async function saveHeadcount(headcountData) {
+  checkToken();
+  return await put(HEADCOUNT_BLOB_PATH, JSON.stringify(headcountData), {
+    access: "public",
+    addRandomSuffix: false,
+    allowOverwrite: true,
+  });
+}
+
+export async function readHeadcount() {
+  checkToken();
+  try {
+    const { blobs } = await list({ prefix: HEADCOUNT_BLOB_PATH });
+    if (!blobs || blobs.length === 0) return null;
+    const b = blobs[0];
+    const data = await fetch(`${b.url}?t=${Date.now()}`).then(r => r.json());
+    return data;
+  } catch (e) {
+    console.error("Failed to read headcount from blob:", e);
+    return null;
+  }
+}

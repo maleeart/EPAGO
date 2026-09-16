@@ -86,9 +86,22 @@ const DEFAULT_WATCHED_LOGS = {
 };
 
 // --- App State ---
+const DB_HEADCOUNT_KEY = "energysave_headcount";
+const DEFAULT_HEADCOUNT = {
+    "สก.ชธธ.": 220,
+    "อบค.": 250,
+    "อบฟ.": 260,
+    "อบย.": 240,
+    "อรอ.": 230,
+    "อคม.": 220,
+    "อหข.": 200,
+    "อื่นๆ": 80
+}; // Default total headcount: 1,700
+
 let videos = [];
 let participants = [];
 let watchedLogs = {};
+let deptHeadcounts = { ...DEFAULT_HEADCOUNT };
 let currentUser = null;
 let currentPlayingVideo = null;
 let playSimInterval = null;
@@ -464,6 +477,16 @@ function initDatabase() {
         localStorage.setItem(DB_WATCHED_KEY, JSON.stringify(DEFAULT_WATCHED_LOGS));
     }
     watchedLogs = JSON.parse(localStorage.getItem(DB_WATCHED_KEY));
+
+    // Headcount Init
+    if (!localStorage.getItem(DB_HEADCOUNT_KEY)) {
+        localStorage.setItem(DB_HEADCOUNT_KEY, JSON.stringify(DEFAULT_HEADCOUNT));
+    }
+    try {
+        deptHeadcounts = JSON.parse(localStorage.getItem(DB_HEADCOUNT_KEY)) || { ...DEFAULT_HEADCOUNT };
+    } catch (e) {
+        deptHeadcounts = { ...DEFAULT_HEADCOUNT };
+    }
 }
 
 // Session Check
@@ -1380,6 +1403,123 @@ async function fetchOnlineParticipants() {
     }
 }
 
+// Headcount Management Functions
+async function fetchOnlineHeadcount() {
+    if (!isOnlineDb) return;
+    try {
+        const response = await fetch(`/api/headcount?t=${Date.now()}`);
+        if (response.ok) {
+            const data = await response.json();
+            if (data.ok && data.headcount && typeof data.headcount === 'object') {
+                deptHeadcounts = { ...DEFAULT_HEADCOUNT, ...data.headcount };
+                localStorage.setItem(DB_HEADCOUNT_KEY, JSON.stringify(deptHeadcounts));
+            }
+        }
+    } catch (e) {
+        console.error("Failed to fetch online headcount:", e);
+    }
+}
+
+function renderHeadcountForm() {
+    const grid = document.getElementById("headcount-inputs-grid");
+    if (!grid) return;
+    grid.innerHTML = "";
+
+    UNITS.forEach(u => {
+        const count = (deptHeadcounts[u] !== undefined) ? deptHeadcounts[u] : (DEFAULT_HEADCOUNT[u] || 0);
+        const card = document.createElement("div");
+        card.className = "headcount-card";
+        card.innerHTML = `
+            <div class="headcount-card-header">
+                <span class="headcount-unit-name">${u}</span>
+                <span style="font-size: 0.75rem; background: #e0e7ff; color: var(--blue-d); font-weight: 700; padding: 0.2rem 0.5rem; border-radius: 6px;">ฝ่าย / สังกัด</span>
+            </div>
+            <div class="headcount-input-wrapper">
+                <input type="number" min="0" step="1" id="headcount-input-${encodeURIComponent(u)}" data-unit="${u}" value="${count}" oninput="updateLiveHeadcountTotal()" placeholder="0">
+                <span class="headcount-unit-suffix">คน</span>
+            </div>
+        `;
+        grid.appendChild(card);
+    });
+
+    updateLiveHeadcountTotal();
+}
+
+function updateLiveHeadcountTotal() {
+    let sum = 0;
+    UNITS.forEach(u => {
+        const input = document.getElementById(`headcount-input-${encodeURIComponent(u)}`);
+        if (input) {
+            const val = parseInt(input.value, 10);
+            if (!isNaN(val) && val >= 0) {
+                sum += val;
+            }
+        } else if (deptHeadcounts[u] !== undefined) {
+            sum += (parseInt(deptHeadcounts[u], 10) || 0);
+        }
+    });
+
+    const totalEl = document.getElementById("headcount-live-total");
+    if (totalEl) {
+        totalEl.innerText = sum.toLocaleString('en-US');
+    }
+    return sum;
+}
+
+async function saveHeadcountSettings() {
+    const newHeadcounts = {};
+    UNITS.forEach(u => {
+        const input = document.getElementById(`headcount-input-${encodeURIComponent(u)}`);
+        if (input) {
+            const val = parseInt(input.value, 10);
+            newHeadcounts[u] = (!isNaN(val) && val >= 0) ? val : 0;
+        } else {
+            newHeadcounts[u] = deptHeadcounts[u] || 0;
+        }
+    });
+
+    deptHeadcounts = newHeadcounts;
+    localStorage.setItem(DB_HEADCOUNT_KEY, JSON.stringify(deptHeadcounts));
+
+    if (isOnlineDb) {
+        try {
+            showToast("กำลังบันทึกจำนวนบุคลากรลงคลาวด์...");
+            const response = await fetch("/api/headcount", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "x-admin-password": encodeURIComponent(adminPassword)
+                },
+                body: JSON.stringify({ headcount: deptHeadcounts })
+            });
+            const resData = await response.json();
+            if (response.ok && resData.ok) {
+                showToast("บันทึกจำนวนบุคลากรขึ้นระบบคลาวด์เรียบร้อยแล้ว ✅");
+            } else {
+                showToast("บันทึกลงฐานข้อมูลคลาวด์ล้มเหลว: " + (resData.error || "ไม่ทราบสาเหตุ"), true);
+            }
+        } catch (e) {
+            console.error("Error saving headcount to cloud:", e);
+            showToast("ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์เพื่อบันทึกได้", true);
+        }
+    } else {
+        showToast("บันทึกจำนวนบุคลากรในเครื่องเรียบร้อยแล้ว (ออฟไลน์) ✅");
+    }
+
+    // Refresh calculations in summary table
+    renderAffiliationRegistrationSummary();
+}
+
+function resetHeadcountSettings() {
+    if (!confirm("คุณต้องการรีเซ็ตจำนวนบุคลากรทุกฝ่ายกลับเป็นค่ามาตรฐานเริ่มต้น (รวม 1,700 คน) ใช่หรือไม่?")) {
+        return;
+    }
+    deptHeadcounts = { ...DEFAULT_HEADCOUNT };
+    localStorage.setItem(DB_HEADCOUNT_KEY, JSON.stringify(deptHeadcounts));
+    renderHeadcountForm();
+    saveHeadcountSettings();
+}
+
 // Refresh admin dashboard wrapper with cloud loading state
 async function refreshAdminDashboard() {
     const totalPText = document.getElementById("admin-total-participants");
@@ -1388,7 +1528,10 @@ async function refreshAdminDashboard() {
     if (isOnlineDb) {
         if (totalPText) totalPText.innerText = "กำลังโหลด...";
         if (totalVText) totalVText.innerText = "กำลังโหลด...";
-        await fetchOnlineParticipants();
+        await Promise.all([
+            fetchOnlineParticipants(),
+            fetchOnlineHeadcount()
+        ]);
     }
     renderAdminDashboard();
 }
@@ -1397,15 +1540,26 @@ async function refreshAdminDashboard() {
 function switchAdminTab(tabName) {
     document.getElementById("tab-videos-btn").classList.remove("active");
     document.getElementById("tab-users-btn").classList.remove("active");
+    const tabHeadcountBtn = document.getElementById("tab-headcount-btn");
+    if (tabHeadcountBtn) tabHeadcountBtn.classList.remove("active");
+
     document.getElementById("admin-tab-videos").classList.remove("active");
     document.getElementById("admin-tab-users").classList.remove("active");
+    const adminTabHeadcount = document.getElementById("admin-tab-headcount");
+    if (adminTabHeadcount) adminTabHeadcount.classList.remove("active");
     
     if (tabName === 'videos') {
         document.getElementById("tab-videos-btn").classList.add("active");
         document.getElementById("admin-tab-videos").classList.add("active");
+    } else if (tabName === 'headcount') {
+        if (tabHeadcountBtn) tabHeadcountBtn.classList.add("active");
+        if (adminTabHeadcount) adminTabHeadcount.classList.add("active");
+        renderHeadcountForm();
+        if (window.lucide) lucide.createIcons();
     } else {
         document.getElementById("tab-users-btn").classList.add("active");
         document.getElementById("admin-tab-users").classList.add("active");
+        renderAffiliationRegistrationSummary();
     }
 }
 
@@ -1448,6 +1602,7 @@ function renderAdminDashboard() {
     renderAdminParticipantsTable();
     renderAffiliationVideoStats();
     renderAffiliationRegistrationSummary();
+    renderHeadcountForm();
 }
 
 function renderAffiliationRegistrationSummary() {
@@ -1506,37 +1661,120 @@ function renderAffiliationRegistrationSummary() {
     // Render rows for each unit
     UNITS.forEach(u => {
         const data = stats[u] || { total: 0, completed: 0, inProgress: 0 };
+        const target = (deptHeadcounts[u] !== undefined) ? parseInt(deptHeadcounts[u], 10) : (DEFAULT_HEADCOUNT[u] || 0);
+        const regCount = data.total;
+        const compCount = data.completed;
+
+        // % Registered
+        let regPctStr = "—";
+        if (target > 0) {
+            regPctStr = ((regCount / target) * 100).toFixed(1) + "%";
+        }
+
+        // % Completed & Evaluation
+        let compPctStr = "—";
+        let compPctVal = 0;
+        let evalBadge = `<span class="badge-eval badge-eval-none">—</span>`;
+        let progressFillClass = "none";
+
+        if (target > 0) {
+            compPctVal = (compCount / target) * 100;
+            compPctStr = compPctVal.toFixed(1) + "%";
+            
+            if (compPctVal >= 80) {
+                evalBadge = `<span class="badge-eval badge-eval-high"><i data-lucide="check-circle-2" style="width: 13px; height: 13px;"></i> ดีเยี่ยม</span>`;
+                progressFillClass = "high";
+            } else if (compPctVal >= 50) {
+                evalBadge = `<span class="badge-eval badge-eval-med"><i data-lucide="alert-triangle" style="width: 13px; height: 13px;"></i> ปานกลาง</span>`;
+                progressFillClass = "med";
+            } else {
+                evalBadge = `<span class="badge-eval badge-eval-low"><i data-lucide="clock" style="width: 13px; height: 13px;"></i> ต้องติดตาม</span>`;
+                progressFillClass = "low";
+            }
+        }
+
         const tr = document.createElement("tr");
         tr.innerHTML = `
             <td><strong>${u}</strong></td>
-            <td style="text-align: center; font-weight: 600; font-family: 'Outfit', sans-serif;">${data.total}</td>
-            <td style="text-align: center; color: #10b981; font-weight: 600; font-family: 'Outfit', sans-serif;">${data.completed}</td>
-            <td style="text-align: center; color: var(--yellow-d); font-weight: 600; font-family: 'Outfit', sans-serif;">${data.inProgress}</td>
+            <td style="text-align: center; font-weight: 700; font-family: 'Outfit', sans-serif; color: var(--blue-d);">${target > 0 ? target.toLocaleString('en-US') : '<span style="color:var(--text-secondary)">—</span>'}</td>
+            <td style="text-align: center; font-weight: 600; font-family: 'Outfit', sans-serif;">${regCount.toLocaleString('en-US')}</td>
+            <td style="text-align: center; font-weight: 600; font-family: 'Outfit', sans-serif; color: var(--blue);">${regPctStr}</td>
+            <td style="text-align: center; color: #10b981; font-weight: 700; font-family: 'Outfit', sans-serif;">${compCount.toLocaleString('en-US')}</td>
+            <td style="text-align: center;">
+                ${target > 0 ? `
+                <div class="table-mini-progress">
+                    <span class="table-mini-progress-pct" style="color: ${compPctVal >= 80 ? '#10b981' : compPctVal >= 50 ? '#f59e0b' : '#ef4444'};">${compPctStr}</span>
+                    <div class="table-mini-progress-track">
+                        <div class="table-mini-progress-fill ${progressFillClass}" style="width: ${Math.min(100, Math.max(0, compPctVal))}%;"></div>
+                    </div>
+                </div>` : `<span style="color: var(--text-secondary);">—</span>`}
+            </td>
+            <td style="text-align: center;">${evalBadge}</td>
         `;
         tbody.appendChild(tr);
     });
     
     // Calculate Grand Total
+    let grandTarget = 0;
     let grandTotal = 0;
     let grandCompleted = 0;
-    let grandInProgress = 0;
-    Object.values(stats).forEach(data => {
-        grandTotal += data.total;
-        grandCompleted += data.completed;
-        grandInProgress += data.inProgress;
-    });
     
-    // Render Grand Total Row
+    UNITS.forEach(u => {
+        const target = (deptHeadcounts[u] !== undefined) ? parseInt(deptHeadcounts[u], 10) : (DEFAULT_HEADCOUNT[u] || 0);
+        if (target > 0) grandTarget += target;
+        const d = stats[u] || { total: 0, completed: 0 };
+        grandTotal += d.total;
+        grandCompleted += d.completed;
+    });
+
+    let grandRegPctStr = "—";
+    let grandCompPctStr = "—";
+    let grandCompPctVal = 0;
+    let grandEvalBadge = `<span class="badge-eval badge-eval-none">—</span>`;
+    let grandProgressFillClass = "none";
+
+    if (grandTarget > 0) {
+        grandRegPctStr = ((grandTotal / grandTarget) * 100).toFixed(1) + "%";
+        grandCompPctVal = (grandCompleted / grandTarget) * 100;
+        grandCompPctStr = grandCompPctVal.toFixed(1) + "%";
+
+        if (grandCompPctVal >= 80) {
+            grandEvalBadge = `<span class="badge-eval badge-eval-high"><i data-lucide="check-circle-2" style="width: 13px; height: 13px;"></i> ดีเยี่ยม</span>`;
+            grandProgressFillClass = "high";
+        } else if (grandCompPctVal >= 50) {
+            grandEvalBadge = `<span class="badge-eval badge-eval-med"><i data-lucide="alert-triangle" style="width: 13px; height: 13px;"></i> ปานกลาง</span>`;
+            grandProgressFillClass = "med";
+        } else {
+            grandEvalBadge = `<span class="badge-eval badge-eval-low"><i data-lucide="clock" style="width: 13px; height: 13px;"></i> ต้องติดตาม</span>`;
+            grandProgressFillClass = "low";
+        }
+    }
+
     const trTotal = document.createElement("tr");
     trTotal.style.backgroundColor = "#eef3fa";
-    trTotal.style.borderTop = "2px solid var(--blue)";
+    trTotal.style.borderTop = "2.5px solid var(--blue)";
     trTotal.innerHTML = `
-        <td><strong style="color: var(--blue-d);">รวมทุกฝ่าย / สังกัดทั้งหมด</strong></td>
-        <td style="text-align: center; font-weight: 800; font-family: 'Outfit', sans-serif; font-size: 1.05rem; color: var(--blue-d);">${grandTotal}</td>
-        <td style="text-align: center; font-weight: 800; font-family: 'Outfit', sans-serif; font-size: 1.05rem; color: #10b981;">${grandCompleted}</td>
-        <td style="text-align: center; font-weight: 800; font-family: 'Outfit', sans-serif; font-size: 1.05rem; color: var(--yellow-d);">${grandInProgress}</td>
+        <td><strong style="color: var(--blue-d); font-size: 0.95rem;">รวมทุกฝ่าย / สังกัดทั้งหมด</strong></td>
+        <td style="text-align: center; font-weight: 800; font-family: 'Outfit', sans-serif; font-size: 1.05rem; color: var(--blue-d);">${grandTarget.toLocaleString('en-US')}</td>
+        <td style="text-align: center; font-weight: 800; font-family: 'Outfit', sans-serif; font-size: 1.05rem; color: var(--blue-d);">${grandTotal.toLocaleString('en-US')}</td>
+        <td style="text-align: center; font-weight: 800; font-family: 'Outfit', sans-serif; font-size: 1rem; color: var(--blue);">${grandRegPctStr}</td>
+        <td style="text-align: center; font-weight: 800; font-family: 'Outfit', sans-serif; font-size: 1.05rem; color: #10b981;">${grandCompleted.toLocaleString('en-US')}</td>
+        <td style="text-align: center;">
+            ${grandTarget > 0 ? `
+            <div class="table-mini-progress">
+                <span class="table-mini-progress-pct" style="color: ${grandCompPctVal >= 80 ? '#10b981' : grandCompPctVal >= 50 ? '#f59e0b' : '#ef4444'}; font-size: 0.95rem;">${grandCompPctStr}</span>
+                <div class="table-mini-progress-track">
+                    <div class="table-mini-progress-fill ${grandProgressFillClass}" style="width: ${Math.min(100, Math.max(0, grandCompPctVal))}%;"></div>
+                </div>
+            </div>` : `<span style="color: var(--text-secondary);">—</span>`}
+        </td>
+        <td style="text-align: center;">${grandEvalBadge}</td>
     `;
     tbody.appendChild(trTotal);
+
+    if (window.lucide) {
+        lucide.createIcons();
+    }
 }
 
 function renderAdminVideosTable() {
