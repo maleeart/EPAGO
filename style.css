@@ -1328,72 +1328,138 @@ body.admin-mode .hero-banner {
     }
 }
 
-/* Headcount Configuration */
-.headcount-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-    gap: 1.25rem;
-    margin-bottom: 1.5rem;
-}
-
-.headcount-card {
-    background: #ffffff;
-    border: 1.5px solid #e2e8f0;
-    border-radius: 12px;
-    padding: 1.1rem 1.25rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.6rem;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+/* Headcount Stepper & Table Styles */
+.headcount-stepper {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    background: #f8fafc;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 3px 6px;
     transition: all var(--transition-fast);
 }
 
-.headcount-card:hover {
+.headcount-stepper:focus-within {
     border-color: var(--blue);
-    box-shadow: 0 4px 12px rgba(27,76,158,0.1);
+    background: #ffffff;
+    box-shadow: 0 0 0 3px rgba(27, 76, 158, 0.12);
 }
 
-.headcount-card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.headcount-unit-name {
-    font-size: 1.05rem;
-    font-weight: 700;
+.headcount-stepper-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    border: 1px solid #cbd5e1;
+    background: #ffffff;
     color: var(--blue-d);
+    font-size: 1.1rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    padding: 0;
+    line-height: 1;
+    user-select: none;
 }
 
-.headcount-input-wrapper {
+.headcount-stepper-btn:hover {
+    background: var(--blue);
+    color: #ffffff;
+    border-color: var(--blue);
+}
+
+.headcount-stepper-btn:active {
+    transform: scale(0.92);
+}
+
+.headcount-stepper input[type="number"] {
+    width: 76px !important;
+    min-width: 0 !important;
+    padding: 4px 6px !important;
+    border: none !important;
+    background: transparent !important;
+    font-family: 'Outfit', sans-serif !important;
+    font-size: 1.05rem !important;
+    font-weight: 700 !important;
+    color: var(--blue-d) !important;
+    text-align: center !important;
+    outline: none !important;
+    box-shadow: none !important;
+    -moz-appearance: textfield !important;
+}
+
+.headcount-stepper input[type="number"]::-webkit-outer-spin-button,
+.headcount-stepper input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none !important;
+    margin: 0 !important;
+}
+
+.headcount-stepper-unit {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    padding-right: 4px;
+}
+
+/* Headcount Table Proportion Column */
+.headcount-pct-wrap {
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    justify-content: center;
+    min-width: 90px;
+    max-width: 120px;
+    margin: 0 auto;
 }
 
-.headcount-input-wrapper input {
-    flex: 1;
-    font-family: 'Outfit', var(--font-family);
-    font-size: 1.25rem;
+.headcount-pct-text {
+    font-family: 'Outfit', sans-serif;
     font-weight: 700;
+    font-size: 0.82rem;
     color: var(--blue-d);
+    min-width: 40px;
     text-align: right;
-    padding: 0.5rem 0.75rem;
-    border: 1.5px solid #cbd5e1;
-    border-radius: 8px;
-    outline: none;
-    transition: border-color var(--transition-fast);
 }
 
-.headcount-input-wrapper input:focus {
-    border-color: var(--blue);
-    box-shadow: 0 0 0 3px rgba(27,76,158,0.15);
+.headcount-pct-track {
+    flex: 1;
+    height: 6px;
+    background-color: #e2e8f0;
+    border-radius: 999px;
+    overflow: hidden;
 }
 
-.headcount-unit-suffix {
-    font-size: 0.9rem;
-    font-weight: 600;
+.headcount-pct-fill {
+    height: 100%;
+    background-color: var(--blue);
+    border-radius: 999px;
+    transition: width 0.3s ease;
+}
+
+/* Headcount Reset Single Unit Button */
+.headcount-reset-unit-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.25rem 0.55rem;
+    border-radius: 6px;
+    border: 1px dashed #cbd5e1;
+    background: #f8fafc;
     color: var(--text-secondary);
+    font-size: 0.78rem;
+    font-family: 'Outfit', var(--font-family);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.headcount-reset-unit-btn:hover {
+    border-color: var(--blue);
+    color: var(--blue);
+    background: #eff6ff;
 }
 
 /* Evaluation Badges */

@@ -1421,48 +1421,183 @@ async function fetchOnlineHeadcount() {
 }
 
 function renderHeadcountForm() {
-    const grid = document.getElementById("headcount-inputs-grid");
-    if (!grid) return;
-    grid.innerHTML = "";
+    const tbody = document.getElementById("headcount-table-tbody");
+    const tfoot = document.getElementById("headcount-table-tfoot");
+    if (!tbody) return;
 
-    UNITS.forEach(u => {
-        const count = (deptHeadcounts[u] !== undefined) ? deptHeadcounts[u] : (DEFAULT_HEADCOUNT[u] || 0);
-        const card = document.createElement("div");
-        card.className = "headcount-card";
-        card.innerHTML = `
-            <div class="headcount-card-header">
-                <span class="headcount-unit-name">${u}</span>
-                <span style="font-size: 0.75rem; background: #e0e7ff; color: var(--blue-d); font-weight: 700; padding: 0.2rem 0.5rem; border-radius: 6px;">ฝ่าย / สังกัด</span>
-            </div>
-            <div class="headcount-input-wrapper">
-                <input type="number" min="0" step="1" id="headcount-input-${encodeURIComponent(u)}" data-unit="${u}" value="${count}" oninput="updateLiveHeadcountTotal()" placeholder="0">
-                <span class="headcount-unit-suffix">คน</span>
-            </div>
-        `;
-        grid.appendChild(card);
+    tbody.innerHTML = "";
+
+    // Count unique registered participants per department for context
+    const registeredByDept = {};
+    UNITS.forEach(u => registeredByDept[u] = 0);
+    
+    const uniqueMap = new Map();
+    participants.forEach(p => {
+        const cleanEmpId = (p.empId && p.empId !== "-") ? String(p.empId).trim().toUpperCase() : "";
+        const key = cleanEmpId ? `emp:${cleanEmpId}` : `contractor:${normalizeName(p.name)}`;
+        if (!uniqueMap.has(key)) {
+            uniqueMap.set(key, p);
+        }
     });
 
+    let totalRegistered = 0;
+    Array.from(uniqueMap.values()).forEach(user => {
+        let deptKey = "อื่นๆ";
+        if (user.dept && UNITS.includes(user.dept) && user.dept !== "อื่นๆ") {
+            deptKey = user.dept;
+        }
+        if (registeredByDept[deptKey] !== undefined) {
+            registeredByDept[deptKey]++;
+            totalRegistered++;
+        }
+    });
+
+    let currentTotalTarget = 0;
+    UNITS.forEach(u => {
+        const count = (deptHeadcounts[u] !== undefined) ? parseInt(deptHeadcounts[u], 10) : (DEFAULT_HEADCOUNT[u] || 0);
+        currentTotalTarget += count;
+    });
+
+    UNITS.forEach(u => {
+        const count = (deptHeadcounts[u] !== undefined) ? parseInt(deptHeadcounts[u], 10) : (DEFAULT_HEADCOUNT[u] || 0);
+        const defCount = (DEFAULT_HEADCOUNT[u] !== undefined) ? DEFAULT_HEADCOUNT[u] : 0;
+        const regCount = registeredByDept[u] || 0;
+        const pct = currentTotalTarget > 0 ? ((count / currentTotalTarget) * 100).toFixed(1) : "0.0";
+
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+            <td>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: var(--blue);"></span>
+                    <strong style="color: var(--blue-d); font-size: 0.95rem;">${u}</strong>
+                </div>
+            </td>
+            <td style="text-align: center;">
+                <span style="font-family: 'Outfit', sans-serif; font-weight: 700; color: var(--blue-d); font-size: 0.95rem;">${regCount.toLocaleString('en-US')}</span>
+                <span style="font-size: 0.8rem; color: var(--text-secondary); margin-left: 2px;">คน</span>
+            </td>
+            <td style="text-align: center;">
+                <div class="headcount-stepper">
+                    <button type="button" class="headcount-stepper-btn" onclick="stepHeadcount('${u}', -10)" title="ลด 10 คน">−</button>
+                    <input type="number" min="0" step="1" id="headcount-input-${encodeURIComponent(u)}" data-unit="${u}" value="${count}" oninput="updateLiveHeadcountTotal()" placeholder="0">
+                    <button type="button" class="headcount-stepper-btn" onclick="stepHeadcount('${u}', 10)" title="เพิ่ม 10 คน">+</button>
+                    <span class="headcount-stepper-unit">คน</span>
+                </div>
+            </td>
+            <td style="text-align: center;">
+                <div class="headcount-pct-wrap">
+                    <span class="headcount-pct-text" id="headcount-pct-${encodeURIComponent(u)}">${pct}%</span>
+                    <div class="headcount-pct-track">
+                        <div class="headcount-pct-fill" id="headcount-bar-${encodeURIComponent(u)}" style="width: ${pct}%;"></div>
+                    </div>
+                </div>
+            </td>
+            <td style="text-align: center;">
+                <button type="button" class="headcount-reset-unit-btn" onclick="resetUnitHeadcount('${u}')" title="คืนค่าเป็นค่าเริ่มต้น (${defCount} คน)">
+                    <span>${defCount}</span>
+                    <i data-lucide="rotate-ccw" style="width: 12px; height: 12px;"></i>
+                </button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    if (tfoot) {
+        tfoot.innerHTML = `
+            <tr style="background-color: #eef3fa; border-top: 2.5px solid var(--blue);">
+                <td><strong style="color: var(--blue-d); font-size: 0.95rem;">รวมทุกฝ่าย / สังกัดทั้งหมด</strong></td>
+                <td style="text-align: center; font-weight: 800; font-family: 'Outfit', sans-serif; font-size: 1rem; color: var(--blue-d);">
+                    ${totalRegistered.toLocaleString('en-US')} <span style="font-size: 0.8rem; font-weight: normal; color: var(--text-secondary);">คน</span>
+                </td>
+                <td style="text-align: center;">
+                    <span style="font-weight: 800; font-family: 'Outfit', sans-serif; font-size: 1.15rem; color: var(--blue-d);" id="headcount-foot-target">${currentTotalTarget.toLocaleString('en-US')}</span>
+                    <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); margin-left: 3px;">คน</span>
+                </td>
+                <td style="text-align: center; font-weight: 800; font-family: 'Outfit', sans-serif; color: var(--blue);">100.0%</td>
+                <td style="text-align: center; font-size: 0.8rem; color: var(--text-secondary); font-weight: 600;">1,700 คน</td>
+            </tr>
+        `;
+    }
+
     updateLiveHeadcountTotal();
+    if (window.lucide) {
+        lucide.createIcons();
+    }
+}
+
+function stepHeadcount(unit, delta) {
+    const input = document.getElementById(`headcount-input-${encodeURIComponent(unit)}`);
+    if (!input) return;
+    let val = parseInt(input.value, 10) || 0;
+    val = Math.max(0, val + delta);
+    input.value = val;
+    updateLiveHeadcountTotal();
+}
+
+function resetUnitHeadcount(unit) {
+    const def = (DEFAULT_HEADCOUNT[unit] !== undefined) ? DEFAULT_HEADCOUNT[unit] : 0;
+    const input = document.getElementById(`headcount-input-${encodeURIComponent(unit)}`);
+    if (input) {
+        input.value = def;
+        updateLiveHeadcountTotal();
+    }
 }
 
 function updateLiveHeadcountTotal() {
     let sum = 0;
+    const currentValues = {};
+
     UNITS.forEach(u => {
         const input = document.getElementById(`headcount-input-${encodeURIComponent(u)}`);
+        let val = 0;
         if (input) {
-            const val = parseInt(input.value, 10);
-            if (!isNaN(val) && val >= 0) {
-                sum += val;
-            }
+            const parsed = parseInt(input.value, 10);
+            val = (!isNaN(parsed) && parsed >= 0) ? parsed : 0;
         } else if (deptHeadcounts[u] !== undefined) {
-            sum += (parseInt(deptHeadcounts[u], 10) || 0);
+            val = parseInt(deptHeadcounts[u], 10) || 0;
         }
+        currentValues[u] = val;
+        sum += val;
     });
 
+    // Update banner total
     const totalEl = document.getElementById("headcount-live-total");
     if (totalEl) {
         totalEl.innerText = sum.toLocaleString('en-US');
     }
+
+    // Update table foot total
+    const footTargetEl = document.getElementById("headcount-foot-target");
+    if (footTargetEl) {
+        footTargetEl.innerText = sum.toLocaleString('en-US');
+    }
+
+    // Update diff badge
+    const diffBadge = document.getElementById("headcount-diff-badge");
+    if (diffBadge) {
+        const diff = sum - 1700;
+        if (diff === 0) {
+            diffBadge.innerText = "ตรงกับค่าเริ่มต้น (1,700 คน)";
+            diffBadge.style.color = "#a7f3d0";
+        } else if (diff > 0) {
+            diffBadge.innerText = `+${diff.toLocaleString('en-US')} คน จากค่าเริ่มต้น (1,700 คน)`;
+            diffBadge.style.color = "#fed7aa";
+        } else {
+            diffBadge.innerText = `${diff.toLocaleString('en-US')} คน จากค่าเริ่มต้น (1,700 คน)`;
+            diffBadge.style.color = "#fecaca";
+        }
+    }
+
+    // Update proportion % for each row
+    UNITS.forEach(u => {
+        const val = currentValues[u] || 0;
+        const pct = sum > 0 ? ((val / sum) * 100).toFixed(1) : "0.0";
+        const textEl = document.getElementById(`headcount-pct-${encodeURIComponent(u)}`);
+        const barEl = document.getElementById(`headcount-bar-${encodeURIComponent(u)}`);
+        if (textEl) textEl.innerText = `${pct}%`;
+        if (barEl) barEl.style.width = `${pct}%`;
+    });
+
     return sum;
 }
 
