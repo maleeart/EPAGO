@@ -34,7 +34,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <!-- Lucide Icons for premium feel -->
     <script src="https://unpkg.com/lucide@latest"></script>
-    <link rel="stylesheet" href="style.css?v=2.4">
+    <link rel="stylesheet" href="style.css?v=2.5">
 </head>
 <body>
     <!-- Background Decor Elements -->
@@ -89,16 +89,82 @@
 
         <!-- VIEW 1: REGISTRATION -->
         <section id="register-view" class="view-section active">
-            <!-- ENGY Greeting speech bubble -->
-            <div class="welcome-mascot-card card">
-                <img src="ENGY PNG/engy 5.png" alt="ENGY Waving" class="mascot-waving">
-                <div class="mascot-speech">
-                    <h3>สวัสดีครับ! ผม <span>ENGY</span> ครับ ⚡</h3>
-                    <p>ยินดีต้อนรับพี่ๆ พนักงานและลูกจ้าง กฟผ. ไทรน้อย ทุกท่านเข้ารับชมสื่อการเรียนรู้เพื่อรณรงค์และปลูกจิตสำนึกการอนุรักษ์พลังงานในชีวิตประจำวัน กรุณาลงทะเบียนด้านล่างนี้เพื่อเริ่มต้นการรับชมกันนะครับ!</p>
-                </div>
-            </div>
+            <div class="register-web-grid">
+                <!-- Left Column (ENGY & Campaign Info on Desktop) -->
+                <div class="register-left-col">
+                    <!-- ENGY Greeting speech bubble -->
+                    <div class="welcome-mascot-card card">
+                        <img src="ENGY PNG/engy 5.png" alt="ENGY Waving" class="mascot-waving">
+                        <div class="mascot-speech">
+                            <h3>สวัสดีครับ! ผม <span>ENGY</span> ครับ ⚡</h3>
+                            <p>ยินดีต้อนรับพี่ๆ พนักงานและลูกจ้าง กฟผ. ไทรน้อย ทุกท่านเข้ารับชมสื่อการเรียนรู้เพื่อรณรงค์และปลูกจิตสำนึกการอนุรักษ์พลังงานในชีวิตประจำวัน กรุณาลงทะเบียนเพื่อเริ่มต้นการรับชมกันนะครับ!</p>
+                        </div>
+                    </div>
 
-            <div class="card register-card">
+                    <!-- Desktop Campaign Highlights Card -->
+                    <div class="card register-highlights-card">
+                        <div class="highlights-header">
+                            <div class="highlights-badge">
+                                <i data-lucide="sparkles"></i>
+                                <span>เป้าหมายกิจกรรม</span>
+                            </div>
+                            <h3 class="highlights-title">ทำไมต้องร่วมชมสื่อเรียนรู้ EPAGO?</h3>
+                        </div>
+                        
+                        <div class="highlights-list">
+                            <div class="highlight-item">
+                                <div class="highlight-icon icon-energy">
+                                    <i data-lucide="zap"></i>
+                                </div>
+                                <div class="highlight-text">
+                                    <h4>ปลูกจิตสำนึกประหยัดพลังงาน</h4>
+                                    <p>เรียนรู้วิธีการอนุรักษ์พลังงานและลดการใช้ไฟฟ้าทั้งในที่ทำงานและชีวิตประจำวัน</p>
+                                </div>
+                            </div>
+
+                            <div class="highlight-item">
+                                <div class="highlight-icon icon-video">
+                                    <i data-lucide="play-circle"></i>
+                                </div>
+                                <div class="highlight-text">
+                                    <h4>เนื้อหากระชับ เข้าใจง่าย 2 ตอน</h4>
+                                    <p>รับชมคลิปวิดีโอคุณภาพสั้นๆ เพียง 2 ตอน จบแล้วระบบจะบันทึกผลสำเร็จให้อัตโนมัติทันที</p>
+                                </div>
+                            </div>
+
+                            <div class="highlight-item">
+                                <div class="highlight-icon icon-target">
+                                    <i data-lucide="award"></i>
+                                </div>
+                                <div class="highlight-text">
+                                    <h4>ร่วมขับเคลื่อนเป้าหมายฝ่ายของคุณ</h4>
+                                    <p>ทุกการรับชมของคุณมีผลต่อการประเมินร้อยละการมีส่วนร่วมของสังกัดและองค์กร</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="highlights-footer">
+                            <div class="highlights-stat">
+                                <span class="stat-num">100%</span>
+                                <span class="stat-lbl">บันทึกออนไลน์ Real-time</span>
+                            </div>
+                            <div class="highlights-stat-sep"></div>
+                            <div class="highlights-stat">
+                                <span class="stat-num">2 คลิป</span>
+                                <span class="stat-lbl">หลักสูตรมาตรฐาน</span>
+                            </div>
+                            <div class="highlights-stat-sep"></div>
+                            <div class="highlights-stat">
+                                <span class="stat-num">กฟผ.</span>
+                                <span class="stat-lbl">ไทรน้อย รักษ์พลังงาน</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Column: Registration Card -->
+                <div class="register-right-col">
+                    <div class="card register-card">
                 <div class="card-header text-center">
                     <div class="badge-icon">
                         <i data-lucide="user-check"></i>
@@ -195,6 +261,8 @@
                         </div>
                     </div>
                 </form>
+                    </div>
+                </div>
             </div>
         </section>
 
@@ -699,6 +767,6 @@
             lucide.createIcons();
         });
     </script>
-    <script src="app.js?v=2.4"></script>
+    <script src="app.js?v=2.5"></script>
 </body>
 </html>

@@ -72,12 +72,13 @@ body {
 }
 
 .header-container {
-    max-width: 820px;
+    max-width: 1240px;
     margin: 0 auto;
-    padding: 0.8rem 14px;
+    padding: 0.85rem 24px;
     display: flex;
     justify-content: space-between;
     align-items: center;
+    transition: max-width var(--transition-normal);
 }
 
 .logo {
@@ -219,9 +220,16 @@ body {
 
 /* Main Container */
 .main-container {
-    max-width: 820px;
+    max-width: 1240px;
     margin: 0 auto;
-    padding: 36px 14px 72px;
+    padding: 36px 24px 72px;
+    transition: max-width var(--transition-normal);
+}
+
+/* Wider canvas for admin dashboard on PC */
+body.admin-mode .header-container,
+body.admin-mode .main-container {
+    max-width: 1360px;
 }
 
 /* EGAT Hero Banner */
@@ -1543,4 +1551,311 @@ body.admin-mode .hero-banner {
 .table-mini-progress-fill.none {
     background-color: #cbd5e1;
 }
+
+/* ==========================================================================
+   DESKTOP WEB LAYOUT & RESPONSIVE ENHANCEMENTS (PC BROWSER ADAPTATION)
+   ========================================================================== */
+
+/* Registration View: Web Grid (2 Columns on Desktop, 1 Column on Mobile) */
+.register-web-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    max-width: 520px;
+    margin: 0 auto;
+}
+
+.register-left-col {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.register-right-col {
+    width: 100%;
+}
+
+/* Campaign Highlights Card: hidden on mobile to keep login ultra-fast */
+.register-highlights-card {
+    display: none;
+}
+
+/* --- Desktop Styles (Tablets in landscape & Desktop PC: >= 992px) --- */
+@media (min-width: 992px) {
+    /* Two-column layout for registration on PC */
+    .register-web-grid {
+        display: grid;
+        grid-template-columns: 1fr 1.05fr;
+        gap: 2.25rem;
+        max-width: 1120px;
+        align-items: start;
+        margin: 1rem auto 2.5rem;
+    }
+    
+    .register-web-grid .register-card {
+        max-width: 100%;
+        margin: 0;
+    }
+    
+    .register-left-col .welcome-mascot-card {
+        margin-bottom: 0;
+    }
+    
+    /* Campaign Highlights Card on Desktop */
+    .register-highlights-card {
+        display: flex;
+        flex-direction: column;
+        gap: 1.25rem;
+        padding: 1.75rem 2rem;
+        background: #ffffff;
+        border: 1px solid var(--border-color);
+        border-radius: 16px;
+        box-shadow: 0 4px 18px rgba(27, 76, 158, 0.06);
+    }
+    
+    .highlights-header {
+        display: flex;
+        flex-direction: column;
+        gap: 0.45rem;
+    }
+    
+    .highlights-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        align-self: flex-start;
+        padding: 0.3rem 0.8rem;
+        background: #eef5ff;
+        color: var(--blue);
+        border: 1px solid rgba(27, 76, 158, 0.15);
+        border-radius: 999px;
+        font-size: 0.82rem;
+        font-weight: 700;
+    }
+    
+    .highlights-badge i {
+        width: 14px;
+        height: 14px;
+        color: var(--yellow-d);
+    }
+    
+    .highlights-title {
+        font-size: 1.22rem;
+        color: var(--blue-d);
+        font-weight: 700;
+        margin: 0;
+    }
+    
+    .highlights-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.85rem;
+    }
+    
+    .highlight-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.9rem;
+        padding: 0.85rem 1rem;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        transition: all var(--transition-fast);
+    }
+    
+    .highlight-item:hover {
+        background: #ffffff;
+        border-color: var(--blue);
+        box-shadow: 0 4px 12px rgba(27, 76, 158, 0.08);
+        transform: translateY(-2px);
+    }
+    
+    .highlight-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+    
+    .highlight-icon i {
+        width: 20px;
+        height: 20px;
+    }
+    
+    .icon-energy {
+        background: #fff8e0;
+        color: var(--yellow-d);
+        border: 1px solid rgba(253, 197, 0, 0.35);
+    }
+    
+    .icon-video {
+        background: #eef5ff;
+        color: var(--blue);
+        border: 1px solid rgba(27, 76, 158, 0.2);
+    }
+    
+    .icon-target {
+        background: #ecfdf5;
+        color: #059669;
+        border: 1px solid rgba(16, 185, 129, 0.25);
+    }
+    
+    .highlight-text h4 {
+        font-size: 0.94rem;
+        color: var(--blue-d);
+        margin: 0 0 0.25rem 0;
+        font-weight: 700;
+    }
+    
+    .highlight-text p {
+        font-size: 0.84rem;
+        color: var(--text-secondary);
+        margin: 0;
+        line-height: 1.45;
+    }
+    
+    .highlights-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-around;
+        padding-top: 1rem;
+        border-top: 1px dashed #e2e8f0;
+        margin-top: 0.25rem;
+    }
+    
+    .highlights-stat {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+    
+    .highlights-stat .stat-num {
+        font-family: 'Outfit', sans-serif;
+        font-size: 1.25rem;
+        font-weight: 800;
+        color: var(--blue);
+        line-height: 1.2;
+    }
+    
+    .highlights-stat .stat-lbl {
+        font-size: 0.76rem;
+        color: var(--text-secondary);
+        margin-top: 2px;
+    }
+    
+    .highlights-stat-sep {
+        width: 1px;
+        height: 28px;
+        background: #e2e8f0;
+    }
+
+    /* Hero Banner enhancements on Desktop */
+    .hero-banner {
+        padding: 38px 270px 38px 38px;
+        border-radius: 20px;
+        margin-bottom: 2rem;
+    }
+    
+    .hero-text h1 {
+        font-size: 2.1rem;
+        line-height: 1.35;
+    }
+    
+    .hero-text p {
+        font-size: 1rem;
+    }
+    
+    .hero-mascot {
+        width: 220px;
+        right: 25px;
+        bottom: -12px;
+    }
+
+    /* Video Grid on PC */
+    .video-grid {
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 1.75rem;
+    }
+
+    /* User Welcome Panel on PC */
+    .user-welcome-panel {
+        padding: 1.6rem 2.2rem;
+        border-radius: 16px;
+        margin-bottom: 2rem;
+    }
+    
+    .welcome-mascot-img {
+        width: 96px;
+    }
+    
+    .welcome-text h3 {
+        font-size: 1.35rem;
+    }
+    
+    .welcome-text p {
+        font-size: 0.95rem;
+    }
+    
+    .welcome-stats {
+        gap: 1.8rem;
+    }
+
+    /* Admin Dashboard on PC */
+    .admin-stats-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+    
+    .stat-card {
+        padding: 1.5rem 1.6rem;
+    }
+    
+    .stat-icon {
+        width: 3.5rem;
+        height: 3.5rem;
+    }
+    
+    .stat-details h4 {
+        font-size: 2.1rem;
+    }
+    
+    .admin-table th,
+    .admin-table td {
+        padding: 0.85rem 1.15rem;
+    }
+
+    /* Cinematic Video Modal on PC */
+    .video-modal-card {
+        max-width: 940px;
+        width: 92%;
+    }
+    
+    .video-player-title {
+        font-size: 1.4rem;
+    }
+}
+
+/* --- Ultra-Wide Desktop Screens (>= 1440px) --- */
+@media (min-width: 1440px) {
+    .header-container,
+    .main-container {
+        max-width: 1320px;
+    }
+    
+    body.admin-mode .header-container,
+    body.admin-mode .main-container {
+        max-width: 1440px;
+    }
+    
+    .video-grid {
+        grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+        gap: 2rem;
+    }
+}
+
 
