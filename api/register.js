@@ -3,7 +3,7 @@ import { findParticipant, saveParticipant } from "./_blob.js";
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "method not allowed" });
 
-  const { emptype, empId, name, dept, regTime } = req.body ?? {};
+  const { emptype, empId, name, dept, division, regTime } = req.body ?? {};
 
   if (!emptype || !name || !dept || !regTime) {
     return res.status(400).json({ error: "ข้อมูลไม่ครบถ้วน" });
@@ -33,6 +33,7 @@ export default async function handler(req, res) {
       empId: cleanEmpId,
       name: name.trim(),
       dept: dept.trim(),
+      division: (division !== undefined && division !== null) ? String(division).trim() : (existing && existing.division ? existing.division : ""),
       regTime: (existing && existing.regTime) ? existing.regTime : regTime,
       watched: watchedList,
       watchedAt: watchedAt,

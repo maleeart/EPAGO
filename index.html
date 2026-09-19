@@ -34,7 +34,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <!-- Lucide Icons for premium feel -->
     <script src="https://unpkg.com/lucide@latest"></script>
-    <link rel="stylesheet" href="style.css?v=2.5">
+    <link rel="stylesheet" href="style.css?v=2.6">
 </head>
 <body>
     <!-- Background Decor Elements -->
@@ -210,11 +210,19 @@
                     </div>
                     
                     <div class="form-group">
-                        <label><i data-lucide="git-branch"></i> สังกัด <span style="color:var(--red)">*</span> <span style="font-weight:normal;color:var(--text-secondary);font-size:0.8rem;margin-left:4px">(กรณีฝากสาย ให้เลือกสังกัดที่ปฏิบัติงานให้แทน)</span></label>
+                        <label><i data-lucide="git-branch"></i> สังกัด ฝ่าย <span style="color:var(--red)">*</span> <span style="font-weight:normal;color:var(--text-secondary);font-size:0.8rem;margin-left:4px">(กรณีฝากสาย ให้เลือกสังกัดที่ปฏิบัติงานให้แทน)</span></label>
                         <div id="units-wrapper" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem; margin-top: 0.4rem;">
                             <!-- Loaded dynamically by JS -->
                         </div>
-                        <input type="text" id="reg-dept-other" class="hidden" placeholder="โปรดระบุสังกัดอื่นๆ" style="margin-top: 0.5rem;">
+                        <input type="text" id="reg-dept-other" class="hidden" placeholder="โปรดระบุสังกัดฝ่ายอื่นๆ" style="margin-top: 0.5rem;">
+                    </div>
+                    
+                    <div class="form-group hidden" id="division-group" style="margin-top: 1rem;">
+                        <label for="reg-division-select"><i data-lucide="layers"></i> สังกัด กอง <span style="color:var(--red)">*</span></label>
+                        <select id="reg-division-select" class="form-select" style="margin-top: 0.4rem;">
+                            <option value="">-- โปรดเลือกสังกัดฝ่ายก่อน --</option>
+                        </select>
+                        <input type="text" id="reg-division-other" class="hidden" placeholder="โปรดระบุสังกัดกองอื่นๆ" style="margin-top: 0.5rem;">
                     </div>
                     
                     <button type="submit" class="btn btn-primary btn-block" style="margin-top: 1.5rem;">
@@ -446,8 +454,11 @@
                         <label for="admin-stat-unit-select" style="font-weight: 700; color: var(--blue-d); font-size: 0.9rem;">
                             เลือกสังกัดเพื่อตรวจสอบ:
                         </label>
-                        <select id="admin-stat-unit-select" onchange="renderAffiliationVideoStats()" style="width: auto; min-width: 180px; padding: 0.4rem 0.8rem; background-color: white;">
+                        <select id="admin-stat-unit-select" onchange="handleAdminUnitFilterChange()" style="width: auto; min-width: 170px; padding: 0.4rem 0.8rem; background-color: white;">
                             <!-- Populated dynamically by JS -->
+                        </select>
+                        <select id="admin-stat-division-select" onchange="handleAdminDivisionFilterChange()" style="width: auto; min-width: 170px; padding: 0.4rem 0.8rem; background-color: white;">
+                            <option value="ทั้งหมด">ทุกสังกัดกอง</option>
                         </select>
                     </div>
                     
@@ -474,7 +485,7 @@
                                 <th>ประเภท</th>
                                 <th>รหัสพนักงาน</th>
                                 <th>ชื่อ - สกุล</th>
-                                <th>สังกัด</th>
+                                <th>สังกัด (ฝ่าย/กอง)</th>
                                 <th>เวลาลงทะเบียน</th>
                                 <th>จำนวนวิดีโอที่ชม</th>
                                 <th style="text-align: center;">การจัดการ</th>
@@ -487,21 +498,24 @@
                 </div>
             </div>
 
-            <!-- TAB 3: DEPARTMENT HEADCOUNT CONFIG -->
+            <!-- TAB 3: DEPARTMENT & DIVISION HEADCOUNT CONFIG -->
             <div id="admin-tab-headcount" class="admin-tab-content">
                 <div class="tab-action-header" style="flex-wrap: wrap; gap: 0.75rem;">
                     <div>
-                        <h3 style="margin-bottom: 0.25rem;">กำหนดจำนวนบุคลากรเป้าหมายแยกตามฝ่าย/สังกัด</h3>
+                        <h3 style="margin-bottom: 0.25rem;">จัดการสังกัดฝ่าย - กอง และกำลังพลเป้าหมาย</h3>
                         <p style="font-size: 0.88rem; color: var(--text-secondary); margin: 0;">
-                            กำหนดจำนวนบุคลากรของแต่ละฝ่ายเพื่อใช้คำนวณร้อยละการเข้าร่วมและประเมินผลสัมฤทธิ์ (เดิมกำหนดไว้รวม 1,700 คน)
+                            แอดมินสามารถเพิ่ม-ลด-แก้ไข สังกัดฝ่ายและกอง และปรับจำนวนกำลังพลเป้าหมายเพื่อใช้คำนวณและประเมินผลความสำเร็จ
                         </p>
                     </div>
-                    <div class="button-group">
+                    <div class="button-group" style="flex-wrap: wrap; gap: 0.5rem;">
+                        <button type="button" class="btn btn-emerald" onclick="openAddDepartmentModal()">
+                            <i data-lucide="folder-plus"></i> เพิ่มฝ่ายใหม่
+                        </button>
                         <button type="button" class="btn btn-outline" onclick="resetHeadcountSettings()">
-                            <i data-lucide="rotate-ccw"></i> รีเซ็ตเป็นค่ามาตรฐาน (1,700 คน)
+                            <i data-lucide="rotate-ccw"></i> คืนค่าเริ่มต้น (1,990 คน)
                         </button>
                         <button type="button" class="btn btn-primary" onclick="saveHeadcountSettings()">
-                            <i data-lucide="save"></i> บันทึกจำนวนบุคลากร
+                            <i data-lucide="save"></i> บันทึกข้อมูลขึ้นคลาวด์
                         </button>
                     </div>
                 </div>
@@ -513,62 +527,42 @@
                             <div>
                                 <span style="font-size: 0.8rem; opacity: 0.85; text-transform: uppercase; letter-spacing: 0.5px;">ยอดรวมบุคลากรเป้าหมาย</span>
                                 <div style="display: flex; align-items: baseline; gap: 0.4rem; margin-top: 0.15rem;">
-                                    <h2 id="headcount-live-total" style="font-size: 1.85rem; margin: 0; font-weight: 800; font-family: 'Outfit', sans-serif; color: #ffca28;">1,700</h2>
+                                    <h2 id="headcount-live-total" style="font-size: 1.85rem; margin: 0; font-weight: 800; font-family: 'Outfit', sans-serif; color: #ffca28;">1,990</h2>
                                     <span style="font-size: 0.95rem; opacity: 0.9;">คน</span>
                                 </div>
                             </div>
                             <div style="border-left: 1px solid rgba(255,255,255,0.2); padding-left: 1.25rem;">
                                 <span style="font-size: 0.8rem; opacity: 0.85; text-transform: uppercase; letter-spacing: 0.5px;">สถานะเปรียบเทียบมาตรฐาน</span>
                                 <div id="headcount-diff-badge" style="font-size: 0.95rem; font-weight: 700; margin-top: 0.15rem; color: #a7f3d0;">
-                                    ตรงกับค่าเริ่มต้น (1,700 คน)
+                                    ตรงกับค่าเริ่มต้นตามภาพอัตรากำลัง
                                 </div>
                             </div>
                         </div>
                         <div style="font-size: 0.82rem; background: rgba(255,255,255,0.12); padding: 0.5rem 0.85rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.18);">
                             <i data-lucide="info" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 4px;"></i>
-                            กดปุ่ม [ − ] หรือ [ + ] หรือพิมพ์ตัวเลขลงในช่องเพื่อปรับค่า
+                            สามารถ เพิ่ม-ลด-แก้ไข ชื่อฝ่าย/กอง และกด [ − ] หรือ [ + ] เพื่อปรับกำลังพล
                         </div>
                     </div>
                 </div>
 
-                <!-- Department Headcount Table Form -->
-                <form id="headcount-form" onsubmit="event.preventDefault(); saveHeadcountSettings();">
-                    <div class="card" style="background-color: #ffffff; border-color: rgba(27,76,158,0.15); padding: 1rem; margin-bottom: 1.25rem;">
-                        <div class="table-responsive">
-                            <table class="admin-table" style="font-size: 0.88rem;">
-                                <thead>
-                                    <tr style="background-color: var(--blue-d);">
-                                        <th style="padding: 0.65rem 0.85rem; font-size: 0.82rem; width: 22%;">สังกัด / ฝ่าย</th>
-                                        <th style="text-align: center; padding: 0.65rem 0.85rem; font-size: 0.82rem; width: 18%;">ผู้ลงทะเบียนปัจจุบัน</th>
-                                        <th style="text-align: center; padding: 0.65rem 0.85rem; font-size: 0.82rem; width: 34%;">กำหนดจำนวนเป้าหมาย</th>
-                                        <th style="text-align: center; padding: 0.65rem 0.85rem; font-size: 0.82rem; width: 16%;">สัดส่วนเป้าหมาย</th>
-                                        <th style="text-align: center; padding: 0.65rem 0.85rem; font-size: 0.82rem; width: 10%;">ค่าเริ่มต้น</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="headcount-table-tbody">
-                                    <!-- Populated dynamically by renderHeadcountForm() -->
-                                </tbody>
-                                <tfoot id="headcount-table-tfoot">
-                                    <!-- Populated dynamically by renderHeadcountForm() -->
-                                </tfoot>
-                            </table>
-                        </div>
-                    </div>
-                    
-                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
-                        <button type="button" class="btn btn-outline" onclick="switchAdminTab('users')">
-                            <i data-lucide="arrow-left"></i> กลับไปดูรายงานสรุป
+                <!-- Interactive Org Cards for Departments & Divisions -->
+                <div id="headcount-departments-container">
+                    <!-- Populated dynamically by renderHeadcountForm() -->
+                </div>
+                
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin-top: 1.5rem;">
+                    <button type="button" class="btn btn-outline" onclick="switchAdminTab('users')">
+                        <i data-lucide="arrow-left"></i> กลับไปดูรายงานสรุป
+                    </button>
+                    <div class="button-group" style="gap: 0.5rem;">
+                        <button type="button" class="btn btn-emerald" onclick="openAddDepartmentModal()">
+                            <i data-lucide="folder-plus"></i> เพิ่มฝ่ายใหม่
                         </button>
-                        <div class="button-group">
-                            <button type="button" class="btn btn-outline" onclick="resetHeadcountSettings()">
-                                <i data-lucide="rotate-ccw"></i> รีเซ็ตเป็นค่ามาตรฐาน (1,700 คน)
-                            </button>
-                            <button type="submit" class="btn btn-primary" style="padding: 0.6rem 1.75rem; font-size: 0.95rem;">
-                                <i data-lucide="save"></i> บันทึกข้อมูลบุคลากรทั้งหมด
-                            </button>
-                        </div>
+                        <button type="button" class="btn btn-primary" onclick="saveHeadcountSettings()" style="padding: 0.6rem 1.75rem; font-size: 0.95rem;">
+                            <i data-lucide="save"></i> บันทึกข้อมูลขึ้นคลาวด์
+                        </button>
                     </div>
-                </form>
+                </div>
             </div>
         </section>
 
@@ -736,20 +730,62 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="edit-dept">สังกัด</label>
+                    <label for="edit-dept">สังกัด ฝ่าย</label>
                     <select id="edit-dept" style="width: 100%; padding: 0.6rem; border-radius: 0.5rem; background-color: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-primary); font-family: var(--font-family); font-size: 0.95rem;" required>
                         <!-- Populated by JS -->
                     </select>
                 </div>
 
                 <div class="form-group hidden" id="edit-dept-other-group">
-                    <label for="edit-dept-other">ระบุสังกัดอื่นๆ</label>
-                    <input type="text" id="edit-dept-other" placeholder="ระบุสังกัดย่อยของท่าน">
+                    <label for="edit-dept-other">ระบุสังกัดฝ่ายอื่นๆ</label>
+                    <input type="text" id="edit-dept-other" placeholder="ระบุสังกัดฝ่ายของท่าน">
                 </div>
 
-                <button type="submit" class="btn btn-primary btn-block">
+                <div class="form-group" id="edit-division-group">
+                    <label for="edit-division">สังกัด กอง</label>
+                    <select id="edit-division" style="width: 100%; padding: 0.6rem; border-radius: 0.5rem; background-color: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-primary); font-family: var(--font-family); font-size: 0.95rem;">
+                        <!-- Populated by JS -->
+                    </select>
+                </div>
+
+                <div class="form-group hidden" id="edit-division-other-group">
+                    <label for="edit-division-other">ระบุสังกัดกองอื่นๆ</label>
+                    <input type="text" id="edit-division-other" placeholder="ระบุสังกัดกองของท่าน">
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-block" style="margin-top: 1.25rem;">
                     บันทึกการแก้ไข <i data-lucide="check"></i>
                 </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal for Adding / Editing Department or Division -->
+    <div id="org-edit-modal" class="modal-backdrop hidden">
+        <div class="modal-card" style="max-width: 480px;">
+            <div class="modal-header">
+                <h3 id="org-modal-title">จัดการสังกัด</h3>
+                <button type="button" class="close-modal-btn" onclick="closeOrgModal()">&times;</button>
+            </div>
+            <form id="org-modal-form" onsubmit="handleOrgModalSubmit(event)">
+                <input type="hidden" id="org-modal-type" value="">
+                <input type="hidden" id="org-modal-dept-key" value="">
+                <input type="hidden" id="org-modal-div-key" value="">
+
+                <div class="form-group">
+                    <label id="org-modal-name-label" for="org-modal-name-input">ชื่อสังกัด</label>
+                    <input type="text" id="org-modal-name-input" required placeholder="ระบุชื่อสังกัด">
+                </div>
+
+                <div class="form-group hidden" id="org-modal-target-group">
+                    <label for="org-modal-target-input">จำนวนกำลังพลเป้าหมาย (คน)</label>
+                    <input type="number" id="org-modal-target-input" min="0" step="1" placeholder="0">
+                </div>
+
+                <div class="modal-actions" style="display: flex; gap: 0.75rem; justify-content: flex-end; margin-top: 1.5rem;">
+                    <button type="button" class="btn btn-outline" onclick="closeOrgModal()">ยกเลิก</button>
+                    <button type="submit" class="btn btn-primary" id="org-modal-save-btn">บันทึก <i data-lucide="check"></i></button>
+                </div>
             </form>
         </div>
     </div>
@@ -767,6 +803,6 @@
             lucide.createIcons();
         });
     </script>
-    <script src="app.js?v=2.5"></script>
+    <script src="app.js?v=2.6"></script>
 </body>
 </html>

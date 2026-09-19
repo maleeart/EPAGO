@@ -87,20 +87,92 @@ const DEFAULT_WATCHED_LOGS = {
 
 // --- App State ---
 const DB_HEADCOUNT_KEY = "energysave_headcount";
-const DEFAULT_HEADCOUNT = {
-    "สก.ชธธ.": 220,
-    "อบค.": 250,
-    "อบฟ.": 260,
-    "อบย.": 240,
-    "อรอ.": 230,
-    "อคม.": 220,
-    "อหข.": 200,
-    "อื่นๆ": 80
-}; // Default total headcount: 1,700
+const DB_DIVISIONS_KEY = "energysave_divisions";
+
+const DEFAULT_DIVISIONS = {
+    "สก.ชธธ.": {
+        "กปฟร-ธ.": 98,
+        "กปฟรร-ธ.": 70,
+        "กปฟนม-ธ.": 66,
+        "กบคธ-ธ.": 50,
+        "กบห-ธ.": 22,
+        "กศม-ธ.": 13,
+        "ขึ้นตรง ชธธ.": 11
+    },
+    "อคม.": {
+        "กคฟ-ธ.": 60,
+        "กคว-ธ.": 34,
+        "กคค-ธ.": 26,
+        "กคภ-ธ.": 13,
+        "กผงม-ธ.": 12,
+        "สก. อคม.": 4
+    },
+    "อบค.": {
+        "กมน-ธ.": 206,
+        "กกห-ธ.": 162,
+        "กกอ-ธ.": 146,
+        "กฟนม-ธ.": 66,
+        "กผงค-ธ.": 17,
+        "สก. อบค.": 12
+    },
+    "อบฟ.": {
+        "กบคพ-ธ.": 126,
+        "กบกม-ธ.": 112,
+        "สก. อบฟ.": 69,
+        "กบมอ-ธ.": 63,
+        "กททอ-ธ.": 43,
+        "กมสว-ธ.": 22,
+        "กผงฟ-ธ.": 20
+    },
+    "อบย.": {
+        "กบร-ธ.": 29,
+        "กวย-ธ.": 28,
+        "กคข-ธ.": 27,
+        "กผงย-ธ.": 16,
+        "สก. อบย.": 4
+    },
+    "อรอ.": {
+        "กงค-ธ.": 110,
+        "กทค-ธ.": 43,
+        "กบออ-ธ.": 31,
+        "กผงอ-ธ.": 18,
+        "สก. อรอ.": 6,
+        "ขึ้นตรง อรอ.": 4
+    },
+    "อหข.": {
+        "กขส-ห.": 73,
+        "กขย-ห.": 32,
+        "กวข-ห.": 21,
+        "สก. อหข.": 5
+    },
+    "อื่นๆ": {
+        "ทั่วไป": 80
+    }
+};
+
+function computeDeptHeadcounts(divs) {
+    const counts = {};
+    for (const [dept, dObj] of Object.entries(divs || {})) {
+        let sum = 0;
+        if (typeof dObj === "object" && dObj !== null) {
+            for (const val of Object.values(dObj)) {
+                sum += Math.max(0, parseInt(val, 10) || 0);
+            }
+        } else {
+            sum = Math.max(0, parseInt(dObj, 10) || 0);
+        }
+        counts[dept] = sum;
+    }
+    return counts;
+}
+
+const DEFAULT_HEADCOUNT = computeDeptHeadcounts(DEFAULT_DIVISIONS);
+const DEFAULT_TOTAL_HEADCOUNT = 2070;
 
 let videos = [];
 let participants = [];
 let watchedLogs = {};
+let deptDivisions = JSON.parse(JSON.stringify(DEFAULT_DIVISIONS));
 let deptHeadcounts = { ...DEFAULT_HEADCOUNT };
 let currentUser = null;
 let currentPlayingVideo = null;
@@ -108,7 +180,63 @@ let playSimInterval = null;
 let isOnlineDb = false;
 let adminPassword = "";
 
-const UNITS = ["สก.ชธธ.","อบค.","อบฟ.","อบย.","อรอ.","อคม.","อหข.","อื่นๆ"];
+let UNITS = Object.keys(deptDivisions);
+let expandedDepts = new Set();
+
+function renderRegistrationUnits() {
+    const unitsWrapper = document.getElementById("units-wrapper");
+    if (!unitsWrapper) return;
+    UNITS = Object.keys(deptDivisions);
+    if (!UNITS.includes("อื่นๆ")) UNITS.push("อื่นๆ");
+
+    const currentChecked = document.querySelector('input[name="unit"]:checked')?.value;
+
+    unitsWrapper.innerHTML = UNITS.map(u => 
+        `<label class="opt"><input type="radio" name="unit" value="${u}" ${currentChecked === u ? 'checked' : ''} required><span>${u}</span></label>`
+    ).join("");
+}
+
+function updateDivisionDropdown(selectedDept, defaultSelected = "") {
+    const divGroup = document.getElementById("division-group");
+    const divSelect = document.getElementById("reg-division-select");
+    const divOther = document.getElementById("reg-division-other");
+    if (!divGroup || !divSelect) return;
+
+    divGroup.classList.remove("hidden");
+    if (divOther) {
+        divOther.classList.add("hidden");
+        divOther.required = false;
+        divOther.value = "";
+    }
+
+    const divObj = deptDivisions[selectedDept] || {};
+    const divNames = Object.keys(divObj);
+
+    let html = `<option value="">-- โปรดเลือกสังกัดกอง --</option>`;
+    divNames.forEach(d => {
+        const isSel = (defaultSelected && defaultSelected === d) ? 'selected' : '';
+        html += `<option value="${d}" ${isSel}>${d}</option>`;
+    });
+    html += `<option value="อื่นๆ" ${(defaultSelected && !divNames.includes(defaultSelected) && defaultSelected !== "") ? 'selected' : ''}>อื่นๆ (ระบุ)</option>`;
+    divSelect.innerHTML = html;
+
+    divSelect.onchange = (e) => {
+        const isOtherDiv = e.target.value === "อื่นๆ";
+        if (divOther) {
+            divOther.classList.toggle("hidden", !isOtherDiv);
+            divOther.required = isOtherDiv;
+            if (isOtherDiv) divOther.focus();
+        }
+    };
+
+    if (defaultSelected && !divNames.includes(defaultSelected) && defaultSelected !== "") {
+        if (divOther) {
+            divOther.classList.remove("hidden");
+            divOther.required = true;
+            divOther.value = defaultSelected;
+        }
+    }
+}
 
 // --- Initialize App ---
 document.addEventListener("DOMContentLoaded", () => {
@@ -118,19 +246,20 @@ document.addEventListener("DOMContentLoaded", () => {
     checkOnlineStatus();
     
     // Render units radio buttons
+    renderRegistrationUnits();
     const unitsWrapper = document.getElementById("units-wrapper");
     if (unitsWrapper) {
-        unitsWrapper.innerHTML = UNITS.map(u => 
-            `<label class="opt"><input type="radio" name="unit" value="${u}" required><span>${u}</span></label>`
-        ).join("");
-        
         unitsWrapper.addEventListener("change", (e) => {
             const otherInput = document.getElementById("reg-dept-other");
             if (e.target.name === "unit") {
-                const isOther = e.target.value === "อื่นๆ";
-                otherInput.classList.toggle("hidden", !isOther);
-                otherInput.required = isOther;
-                if (isOther) otherInput.focus();
+                const selectedDept = e.target.value;
+                const isOther = selectedDept === "อื่นๆ";
+                if (otherInput) {
+                    otherInput.classList.toggle("hidden", !isOther);
+                    otherInput.required = isOther;
+                    if (isOther) otherInput.focus();
+                }
+                updateDivisionDropdown(selectedDept);
             }
         });
     }
@@ -478,15 +607,23 @@ function initDatabase() {
     }
     watchedLogs = JSON.parse(localStorage.getItem(DB_WATCHED_KEY));
 
-    // Headcount Init
-    if (!localStorage.getItem(DB_HEADCOUNT_KEY)) {
-        localStorage.setItem(DB_HEADCOUNT_KEY, JSON.stringify(DEFAULT_HEADCOUNT));
+    // Headcount & Divisions Init
+    if (!localStorage.getItem(DB_DIVISIONS_KEY)) {
+        localStorage.setItem(DB_DIVISIONS_KEY, JSON.stringify(DEFAULT_DIVISIONS));
     }
     try {
-        deptHeadcounts = JSON.parse(localStorage.getItem(DB_HEADCOUNT_KEY)) || { ...DEFAULT_HEADCOUNT };
+        const storedDivs = JSON.parse(localStorage.getItem(DB_DIVISIONS_KEY));
+        if (storedDivs && typeof storedDivs === "object" && Object.keys(storedDivs).length > 0) {
+            deptDivisions = storedDivs;
+        } else {
+            deptDivisions = JSON.parse(JSON.stringify(DEFAULT_DIVISIONS));
+        }
     } catch (e) {
-        deptHeadcounts = { ...DEFAULT_HEADCOUNT };
+        deptDivisions = JSON.parse(JSON.stringify(DEFAULT_DIVISIONS));
     }
+    deptHeadcounts = computeDeptHeadcounts(deptDivisions);
+    UNITS = Object.keys(deptDivisions);
+    localStorage.setItem(DB_HEADCOUNT_KEY, JSON.stringify(deptHeadcounts));
 }
 
 // Session Check
@@ -616,9 +753,15 @@ async function handleRegistration(e) {
     if (dept === "อื่นๆ") {
         dept = document.getElementById("reg-dept-other").value.trim();
     }
+
+    const divSelect = document.getElementById("reg-division-select");
+    let division = divSelect ? divSelect.value : "";
+    if (division === "อื่นๆ") {
+        division = document.getElementById("reg-division-other").value.trim();
+    }
     
-    if (!emptype || !name || !dept) {
-        showToast("กรุณากรอกข้อมูลให้ครบถ้วน", true);
+    if (!emptype || !name || !dept || (!division && dept !== "อื่นๆ")) {
+        showToast("กรุณากรอกข้อมูลให้ครบถ้วน รวมถึงสังกัดกอง", true);
         return;
     }
     
@@ -631,6 +774,7 @@ async function handleRegistration(e) {
         empId,
         name,
         dept,
+        division: division || "-",
         regTime: formattedDate
     };
     
@@ -726,7 +870,15 @@ async function handleRegistration(e) {
         empidGroup.classList.remove("hidden");
         empidInput.required = true;
     }
-    
+    const divGroup = document.getElementById("division-group");
+    if (divGroup) {
+        divGroup.classList.add("hidden");
+    }
+    const divOtherInput = document.getElementById("reg-division-other");
+    if (divOtherInput) {
+        divOtherInput.classList.add("hidden");
+        divOtherInput.required = false;
+    }
 }
 
 // Switch between New Registration and Returning User Login Mode
@@ -1403,16 +1555,23 @@ async function fetchOnlineParticipants() {
     }
 }
 
-// Headcount Management Functions
+// Headcount & Organization Management Functions
 async function fetchOnlineHeadcount() {
     if (!isOnlineDb) return;
     try {
         const response = await fetch(`/api/headcount?t=${Date.now()}`);
         if (response.ok) {
             const data = await response.json();
-            if (data.ok && data.headcount && typeof data.headcount === 'object') {
-                deptHeadcounts = { ...DEFAULT_HEADCOUNT, ...data.headcount };
+            if (data.ok) {
+                if (data.divisions && typeof data.divisions === 'object') {
+                    deptDivisions = data.divisions;
+                    localStorage.setItem(DB_DIVISIONS_KEY, JSON.stringify(deptDivisions));
+                }
+                deptHeadcounts = computeDeptHeadcounts(deptDivisions);
+                UNITS = Object.keys(deptDivisions);
+                if (!UNITS.includes("อื่นๆ")) UNITS.push("อื่นๆ");
                 localStorage.setItem(DB_HEADCOUNT_KEY, JSON.stringify(deptHeadcounts));
+                renderRegistrationUnits();
             }
         }
     } catch (e) {
@@ -1421,16 +1580,22 @@ async function fetchOnlineHeadcount() {
 }
 
 function renderHeadcountForm() {
-    const tbody = document.getElementById("headcount-table-tbody");
-    const tfoot = document.getElementById("headcount-table-tfoot");
-    if (!tbody) return;
+    const container = document.getElementById("headcount-departments-container");
+    if (!container) return;
 
-    tbody.innerHTML = "";
+    container.innerHTML = "";
 
-    // Count unique registered participants per department for context
+    // Count unique registered participants per department and per division
     const registeredByDept = {};
-    UNITS.forEach(u => registeredByDept[u] = 0);
-    
+    const registeredByDiv = {};
+    Object.keys(deptDivisions).forEach(dept => {
+        registeredByDept[dept] = 0;
+        registeredByDiv[dept] = {};
+        Object.keys(deptDivisions[dept] || {}).forEach(div => {
+            registeredByDiv[dept][div] = 0;
+        });
+    });
+
     const uniqueMap = new Map();
     participants.forEach(p => {
         const cleanEmpId = (p.empId && p.empId !== "-") ? String(p.empId).trim().toUpperCase() : "";
@@ -1440,84 +1605,149 @@ function renderHeadcountForm() {
         }
     });
 
-    let totalRegistered = 0;
     Array.from(uniqueMap.values()).forEach(user => {
-        let deptKey = "อื่นๆ";
-        if (user.dept && UNITS.includes(user.dept) && user.dept !== "อื่นๆ") {
-            deptKey = user.dept;
+        let deptKey = user.dept || "อื่นๆ";
+        if (!deptDivisions[deptKey]) {
+            deptKey = "อื่นๆ";
         }
         if (registeredByDept[deptKey] !== undefined) {
             registeredByDept[deptKey]++;
-            totalRegistered++;
+        }
+        const divKey = user.division;
+        if (divKey && registeredByDiv[deptKey] && registeredByDiv[deptKey][divKey] !== undefined) {
+            registeredByDiv[deptKey][divKey]++;
         }
     });
 
-    let currentTotalTarget = 0;
-    UNITS.forEach(u => {
-        const count = (deptHeadcounts[u] !== undefined) ? parseInt(deptHeadcounts[u], 10) : (DEFAULT_HEADCOUNT[u] || 0);
-        currentTotalTarget += count;
-    });
+    const deptKeys = Object.keys(deptDivisions);
 
-    UNITS.forEach(u => {
-        const count = (deptHeadcounts[u] !== undefined) ? parseInt(deptHeadcounts[u], 10) : (DEFAULT_HEADCOUNT[u] || 0);
-        const defCount = (DEFAULT_HEADCOUNT[u] !== undefined) ? DEFAULT_HEADCOUNT[u] : 0;
-        const regCount = registeredByDept[u] || 0;
-        const pct = currentTotalTarget > 0 ? ((count / currentTotalTarget) * 100).toFixed(1) : "0.0";
+    deptKeys.forEach(dept => {
+        const divObj = deptDivisions[dept] || {};
+        const divEntries = Object.entries(divObj);
+        
+        let deptTargetSum = 0;
+        divEntries.forEach(([_, count]) => {
+            deptTargetSum += (parseInt(count, 10) || 0);
+        });
+        const deptRegCount = registeredByDept[dept] || 0;
 
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
-            <td>
-                <div style="display: flex; align-items: center; gap: 0.5rem;">
-                    <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: var(--blue);"></span>
-                    <strong style="color: var(--blue-d); font-size: 0.95rem;">${u}</strong>
+        const card = document.createElement("div");
+        card.className = "org-dept-card";
+
+        let tableRowsHtml = "";
+        divEntries.forEach(([divName, count]) => {
+            const numCount = parseInt(count, 10) || 0;
+            const regCount = (registeredByDiv[dept] && registeredByDiv[dept][divName]) ? registeredByDiv[dept][divName] : 0;
+            const pct = deptTargetSum > 0 ? ((numCount / deptTargetSum) * 100).toFixed(1) : "0.0";
+            const encodedDept = encodeURIComponent(dept);
+            const encodedDiv = encodeURIComponent(divName);
+
+            tableRowsHtml += `
+                <tr>
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <i data-lucide="layers" style="width: 15px; height: 15px; color: var(--blue);"></i>
+                            <strong style="color: var(--blue-d); font-size: 0.92rem;">${divName}</strong>
+                        </div>
+                    </td>
+                    <td style="text-align: center;">
+                        <span style="font-family: 'Outfit', sans-serif; font-weight: 700; color: var(--blue-d); font-size: 0.92rem;">${regCount.toLocaleString('en-US')}</span>
+                        <span style="font-size: 0.78rem; color: var(--text-secondary); margin-left: 2px;">คน</span>
+                    </td>
+                    <td style="text-align: center;">
+                        <div class="headcount-stepper">
+                            <button type="button" class="headcount-stepper-btn" onclick="stepDivisionHeadcount('${encodedDept}', '${encodedDiv}', -10)" title="ลด 10 คน">−</button>
+                            <input type="number" min="0" step="1" id="div-input-${encodedDept}-${encodedDiv}" value="${numCount}" oninput="onDivisionInputChange('${encodedDept}', '${encodedDiv}', this)" placeholder="0">
+                            <button type="button" class="headcount-stepper-btn" onclick="stepDivisionHeadcount('${encodedDept}', '${encodedDiv}', 10)" title="เพิ่ม 10 คน">+</button>
+                            <span class="headcount-stepper-unit">คน</span>
+                        </div>
+                    </td>
+                    <td style="text-align: center;">
+                        <div class="headcount-pct-wrap">
+                            <span class="headcount-pct-text" id="div-pct-${encodedDept}-${encodedDiv}">${pct}%</span>
+                            <div class="headcount-pct-track">
+                                <div class="headcount-pct-fill" id="div-bar-${encodedDept}-${encodedDiv}" style="width: ${pct}%;"></div>
+                            </div>
+                        </div>
+                    </td>
+                    <td style="text-align: center;">
+                        <div class="button-group" style="justify-content: center; gap: 0.35rem; display: inline-flex;">
+                            <button type="button" class="btn-xs btn-xs-outline" onclick="openEditDivisionModal('${encodedDept}', '${encodedDiv}')" title="แก้ไขชื่อสังกัดกองนี้">
+                                <i data-lucide="edit-3" style="width: 12px; height: 12px;"></i> แก้ไข
+                            </button>
+                            <button type="button" class="btn-xs btn-xs-danger" onclick="deleteDivision('${encodedDept}', '${encodedDiv}')" title="ลบสังกัดกองนี้">
+                                <i data-lucide="trash" style="width: 12px; height: 12px;"></i> ลบ
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        });
+
+        if (divEntries.length === 0) {
+            tableRowsHtml = `
+                <tr>
+                    <td colspan="5" style="text-align: center; padding: 1.5rem; color: var(--text-secondary);">
+                        ยังไม่มีสังกัดกองในฝ่ายนี้ กดปุ่ม "+ เพิ่มสังกัดกอง" เพื่อเพิ่มรายการ
+                    </td>
+                </tr>
+            `;
+        }
+
+        const encodedDept = encodeURIComponent(dept);
+
+        card.innerHTML = `
+            <div class="org-dept-header">
+                <div class="org-dept-title-wrap">
+                    <span style="width: 12px; height: 12px; border-radius: 50%; background-color: var(--blue);"></span>
+                    <h4 style="margin: 0; color: var(--blue-d); font-size: 1.15rem; font-weight: 700;">${dept}</h4>
+                    <span class="org-dept-badge" id="dept-badge-target-${encodedDept}">เป้าหมายรวม: ${deptTargetSum.toLocaleString('en-US')} คน</span>
+                    <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); background: #f1f5f9; padding: 0.25rem 0.65rem; border-radius: 999px;">
+                        ลงทะเบียนแล้ว: ${deptRegCount.toLocaleString('en-US')} คน
+                    </span>
                 </div>
-            </td>
-            <td style="text-align: center;">
-                <span style="font-family: 'Outfit', sans-serif; font-weight: 700; color: var(--blue-d); font-size: 0.95rem;">${regCount.toLocaleString('en-US')}</span>
-                <span style="font-size: 0.8rem; color: var(--text-secondary); margin-left: 2px;">คน</span>
-            </td>
-            <td style="text-align: center;">
-                <div class="headcount-stepper">
-                    <button type="button" class="headcount-stepper-btn" onclick="stepHeadcount('${u}', -10)" title="ลด 10 คน">−</button>
-                    <input type="number" min="0" step="1" id="headcount-input-${encodeURIComponent(u)}" data-unit="${u}" value="${count}" oninput="updateLiveHeadcountTotal()" placeholder="0">
-                    <button type="button" class="headcount-stepper-btn" onclick="stepHeadcount('${u}', 10)" title="เพิ่ม 10 คน">+</button>
-                    <span class="headcount-stepper-unit">คน</span>
+                <div class="org-dept-actions">
+                    <button type="button" class="btn-xs btn-xs-outline" onclick="openEditDepartmentModal('${encodedDept}')">
+                        <i data-lucide="edit-2" style="width: 13px; height: 13px;"></i> แก้ไขชื่อฝ่าย
+                    </button>
+                    <button type="button" class="btn-xs btn-xs-primary" onclick="openAddDivisionModal('${encodedDept}')">
+                        <i data-lucide="plus" style="width: 13px; height: 13px;"></i> เพิ่มกอง
+                    </button>
+                    <button type="button" class="btn-xs btn-xs-danger" onclick="deleteDepartment('${encodedDept}')" title="ลบฝ่ายนี้">
+                        <i data-lucide="trash-2" style="width: 13px; height: 13px;"></i> ลบฝ่าย
+                    </button>
                 </div>
-            </td>
-            <td style="text-align: center;">
-                <div class="headcount-pct-wrap">
-                    <span class="headcount-pct-text" id="headcount-pct-${encodeURIComponent(u)}">${pct}%</span>
-                    <div class="headcount-pct-track">
-                        <div class="headcount-pct-fill" id="headcount-bar-${encodeURIComponent(u)}" style="width: ${pct}%;"></div>
-                    </div>
-                </div>
-            </td>
-            <td style="text-align: center;">
-                <button type="button" class="headcount-reset-unit-btn" onclick="resetUnitHeadcount('${u}')" title="คืนค่าเป็นค่าเริ่มต้น (${defCount} คน)">
-                    <span>${defCount}</span>
-                    <i data-lucide="rotate-ccw" style="width: 12px; height: 12px;"></i>
+            </div>
+
+            <div class="table-responsive">
+                <table class="admin-table" style="font-size: 0.88rem;">
+                    <thead>
+                        <tr style="background-color: #f1f5f9; color: var(--blue-d);">
+                            <th style="padding: 0.6rem 0.85rem; font-size: 0.82rem; width: 28%; background-color: #f1f5f9; color: var(--blue-d);">ชื่อสังกัดกอง</th>
+                            <th style="text-align: center; padding: 0.6rem 0.85rem; font-size: 0.82rem; width: 16%; background-color: #f1f5f9; color: var(--blue-d);">ผู้ลงทะเบียนปัจจุบัน</th>
+                            <th style="text-align: center; padding: 0.6rem 0.85rem; font-size: 0.82rem; width: 26%; background-color: #f1f5f9; color: var(--blue-d);">กำลังพลเป้าหมาย</th>
+                            <th style="text-align: center; padding: 0.6rem 0.85rem; font-size: 0.82rem; width: 15%; background-color: #f1f5f9; color: var(--blue-d);">สัดส่วนในฝ่าย</th>
+                            <th style="text-align: center; padding: 0.6rem 0.85rem; font-size: 0.82rem; width: 15%; background-color: #f1f5f9; color: var(--blue-d);">การจัดการ</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${tableRowsHtml}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="org-dept-footer">
+                <button type="button" class="btn-xs btn-xs-outline" onclick="openAddDivisionModal('${encodedDept}')">
+                    <i data-lucide="plus-circle" style="width: 13px; height: 13px;"></i> เพิ่มสังกัดกองใหม่ในฝ่าย ${dept}
                 </button>
-            </td>
+                <div style="font-size: 0.82rem; color: var(--text-secondary);">
+                    รวมทั้งหมด ${divEntries.length} กอง
+                </div>
+            </div>
         `;
-        tbody.appendChild(tr);
-    });
 
-    if (tfoot) {
-        tfoot.innerHTML = `
-            <tr style="background-color: #eef3fa; border-top: 2.5px solid var(--blue);">
-                <td><strong style="color: var(--blue-d); font-size: 0.95rem;">รวมทุกฝ่าย / สังกัดทั้งหมด</strong></td>
-                <td style="text-align: center; font-weight: 800; font-family: 'Outfit', sans-serif; font-size: 1rem; color: var(--blue-d);">
-                    ${totalRegistered.toLocaleString('en-US')} <span style="font-size: 0.8rem; font-weight: normal; color: var(--text-secondary);">คน</span>
-                </td>
-                <td style="text-align: center;">
-                    <span style="font-weight: 800; font-family: 'Outfit', sans-serif; font-size: 1.15rem; color: var(--blue-d);" id="headcount-foot-target">${currentTotalTarget.toLocaleString('en-US')}</span>
-                    <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); margin-left: 3px;">คน</span>
-                </td>
-                <td style="text-align: center; font-weight: 800; font-family: 'Outfit', sans-serif; color: var(--blue);">100.0%</td>
-                <td style="text-align: center; font-size: 0.8rem; color: var(--text-secondary); font-weight: 600;">1,700 คน</td>
-            </tr>
-        `;
-    }
+        container.appendChild(card);
+    });
 
     updateLiveHeadcountTotal();
     if (window.lucide) {
@@ -1525,111 +1755,279 @@ function renderHeadcountForm() {
     }
 }
 
-function stepHeadcount(unit, delta) {
-    const input = document.getElementById(`headcount-input-${encodeURIComponent(unit)}`);
-    if (!input) return;
-    let val = parseInt(input.value, 10) || 0;
+function stepDivisionHeadcount(encodedDept, encodedDiv, delta) {
+    const dept = decodeURIComponent(encodedDept);
+    const divName = decodeURIComponent(encodedDiv);
+    if (!deptDivisions[dept] || deptDivisions[dept][divName] === undefined) return;
+
+    let val = parseInt(deptDivisions[dept][divName], 10) || 0;
     val = Math.max(0, val + delta);
-    input.value = val;
+    deptDivisions[dept][divName] = val;
+
+    const input = document.getElementById(`div-input-${encodedDept}-${encodedDiv}`);
+    if (input) input.value = val;
+
+    deptHeadcounts = computeDeptHeadcounts(deptDivisions);
     updateLiveHeadcountTotal();
 }
 
-function resetUnitHeadcount(unit) {
-    const def = (DEFAULT_HEADCOUNT[unit] !== undefined) ? DEFAULT_HEADCOUNT[unit] : 0;
-    const input = document.getElementById(`headcount-input-${encodeURIComponent(unit)}`);
-    if (input) {
-        input.value = def;
-        updateLiveHeadcountTotal();
-    }
+function onDivisionInputChange(encodedDept, encodedDiv, el) {
+    const dept = decodeURIComponent(encodedDept);
+    const divName = decodeURIComponent(encodedDiv);
+    if (!deptDivisions[dept] || deptDivisions[dept][divName] === undefined) return;
+
+    let val = parseInt(el.value, 10);
+    if (isNaN(val) || val < 0) val = 0;
+    deptDivisions[dept][divName] = val;
+
+    deptHeadcounts = computeDeptHeadcounts(deptDivisions);
+    updateLiveHeadcountTotal();
 }
 
 function updateLiveHeadcountTotal() {
-    let sum = 0;
-    const currentValues = {};
+    let grandSum = 0;
 
-    UNITS.forEach(u => {
-        const input = document.getElementById(`headcount-input-${encodeURIComponent(u)}`);
-        let val = 0;
-        if (input) {
-            const parsed = parseInt(input.value, 10);
-            val = (!isNaN(parsed) && parsed >= 0) ? parsed : 0;
-        } else if (deptHeadcounts[u] !== undefined) {
-            val = parseInt(deptHeadcounts[u], 10) || 0;
-        }
-        currentValues[u] = val;
-        sum += val;
+    Object.keys(deptDivisions).forEach(dept => {
+        const divObj = deptDivisions[dept] || {};
+        let deptSum = 0;
+        const encodedDept = encodeURIComponent(dept);
+
+        Object.entries(divObj).forEach(([divName, count]) => {
+            const num = Math.max(0, parseInt(count, 10) || 0);
+            deptSum += num;
+            grandSum += num;
+        });
+
+        // Update dept badge
+        const badge = document.getElementById(`dept-badge-target-${encodedDept}`);
+        if (badge) badge.innerText = `เป้าหมายรวม: ${deptSum.toLocaleString('en-US')} คน`;
+
+        // Update proportion bars inside dept
+        Object.entries(divObj).forEach(([divName, count]) => {
+            const num = Math.max(0, parseInt(count, 10) || 0);
+            const pct = deptSum > 0 ? ((num / deptSum) * 100).toFixed(1) : "0.0";
+            const encodedDiv = encodeURIComponent(divName);
+            const textEl = document.getElementById(`div-pct-${encodedDept}-${encodedDiv}`);
+            const barEl = document.getElementById(`div-bar-${encodedDept}-${encodedDiv}`);
+            if (textEl) textEl.innerText = `${pct}%`;
+            if (barEl) barEl.style.width = `${pct}%`;
+        });
     });
 
     // Update banner total
     const totalEl = document.getElementById("headcount-live-total");
     if (totalEl) {
-        totalEl.innerText = sum.toLocaleString('en-US');
-    }
-
-    // Update table foot total
-    const footTargetEl = document.getElementById("headcount-foot-target");
-    if (footTargetEl) {
-        footTargetEl.innerText = sum.toLocaleString('en-US');
+        totalEl.innerText = grandSum.toLocaleString('en-US');
     }
 
     // Update diff badge
     const diffBadge = document.getElementById("headcount-diff-badge");
     if (diffBadge) {
-        const diff = sum - 1700;
+        const diff = grandSum - 1990;
         if (diff === 0) {
-            diffBadge.innerText = "ตรงกับค่าเริ่มต้น (1,700 คน)";
+            diffBadge.innerText = "ตรงกับค่าเริ่มต้นตามภาพอัตรากำลัง (1,990 คน)";
             diffBadge.style.color = "#a7f3d0";
         } else if (diff > 0) {
-            diffBadge.innerText = `+${diff.toLocaleString('en-US')} คน จากค่าเริ่มต้น (1,700 คน)`;
+            diffBadge.innerText = `+${diff.toLocaleString('en-US')} คน จากค่าเริ่มต้น (1,990 คน)`;
             diffBadge.style.color = "#fed7aa";
         } else {
-            diffBadge.innerText = `${diff.toLocaleString('en-US')} คน จากค่าเริ่มต้น (1,700 คน)`;
+            diffBadge.innerText = `${diff.toLocaleString('en-US')} คน จากค่าเริ่มต้น (1,990 คน)`;
             diffBadge.style.color = "#fecaca";
         }
     }
 
-    // Update proportion % for each row
-    UNITS.forEach(u => {
-        const val = currentValues[u] || 0;
-        const pct = sum > 0 ? ((val / sum) * 100).toFixed(1) : "0.0";
-        const textEl = document.getElementById(`headcount-pct-${encodeURIComponent(u)}`);
-        const barEl = document.getElementById(`headcount-bar-${encodeURIComponent(u)}`);
-        if (textEl) textEl.innerText = `${pct}%`;
-        if (barEl) barEl.style.width = `${pct}%`;
-    });
+    return grandSum;
+}
 
-    return sum;
+// Modal management for Department & Division CRUD
+function openAddDepartmentModal() {
+    document.getElementById("org-modal-type").value = "add_dept";
+    document.getElementById("org-modal-dept-key").value = "";
+    document.getElementById("org-modal-div-key").value = "";
+    document.getElementById("org-modal-title").innerText = "เพิ่มสังกัดฝ่ายใหม่";
+    document.getElementById("org-modal-name-label").innerText = "ชื่อสังกัดฝ่าย (เช่น อบค., ฝบธ.)";
+    document.getElementById("org-modal-name-input").value = "";
+    document.getElementById("org-modal-name-input").placeholder = "ระบุชื่อสังกัดฝ่ายใหม่";
+    document.getElementById("org-modal-target-group").classList.add("hidden");
+    document.getElementById("org-edit-modal").classList.remove("hidden");
+    document.getElementById("org-modal-name-input").focus();
+}
+
+function openEditDepartmentModal(encodedDept) {
+    const dept = decodeURIComponent(encodedDept);
+    document.getElementById("org-modal-type").value = "edit_dept";
+    document.getElementById("org-modal-dept-key").value = dept;
+    document.getElementById("org-modal-div-key").value = "";
+    document.getElementById("org-modal-title").innerText = `แก้ไขชื่อฝ่าย (${dept})`;
+    document.getElementById("org-modal-name-label").innerText = "ชื่อสังกัดฝ่าย";
+    document.getElementById("org-modal-name-input").value = dept;
+    document.getElementById("org-modal-target-group").classList.add("hidden");
+    document.getElementById("org-edit-modal").classList.remove("hidden");
+    document.getElementById("org-modal-name-input").focus();
+}
+
+function deleteDepartment(encodedDept) {
+    const dept = decodeURIComponent(encodedDept);
+    if (!confirm(`คุณต้องการลบสังกัดฝ่าย "${dept}" และสังกัดกองทั้งหมดในฝ่ายนี้ใช่หรือไม่?`)) {
+        return;
+    }
+    delete deptDivisions[dept];
+    deptHeadcounts = computeDeptHeadcounts(deptDivisions);
+    UNITS = Object.keys(deptDivisions);
+    if (!UNITS.includes("อื่นๆ")) UNITS.push("อื่นๆ");
+    localStorage.setItem(DB_DIVISIONS_KEY, JSON.stringify(deptDivisions));
+    localStorage.setItem(DB_HEADCOUNT_KEY, JSON.stringify(deptHeadcounts));
+    renderHeadcountForm();
+    renderRegistrationUnits();
+    renderAffiliationRegistrationSummary();
+    showToast(`ลบฝ่าย ${dept} เรียบร้อยแล้ว`);
+}
+
+function openAddDivisionModal(encodedDept) {
+    const dept = decodeURIComponent(encodedDept);
+    document.getElementById("org-modal-type").value = "add_div";
+    document.getElementById("org-modal-dept-key").value = dept;
+    document.getElementById("org-modal-div-key").value = "";
+    document.getElementById("org-modal-title").innerText = `เพิ่มสังกัดกองใหม่ (ฝ่าย ${dept})`;
+    document.getElementById("org-modal-name-label").innerText = "ชื่อสังกัดกอง";
+    document.getElementById("org-modal-name-input").value = "";
+    document.getElementById("org-modal-name-input").placeholder = "ระบุชื่อสังกัดกอง (เช่น กมน-ธ.)";
+    document.getElementById("org-modal-target-group").classList.remove("hidden");
+    document.getElementById("org-modal-target-input").value = 20;
+    document.getElementById("org-edit-modal").classList.remove("hidden");
+    document.getElementById("org-modal-name-input").focus();
+}
+
+function openEditDivisionModal(encodedDept, encodedDiv) {
+    const dept = decodeURIComponent(encodedDept);
+    const divName = decodeURIComponent(encodedDiv);
+    const count = (deptDivisions[dept] && deptDivisions[dept][divName]) ? deptDivisions[dept][divName] : 0;
+    
+    document.getElementById("org-modal-type").value = "edit_div";
+    document.getElementById("org-modal-dept-key").value = dept;
+    document.getElementById("org-modal-div-key").value = divName;
+    document.getElementById("org-modal-title").innerText = `แก้ไขสังกัดกอง (${divName})`;
+    document.getElementById("org-modal-name-label").innerText = "ชื่อสังกัดกอง";
+    document.getElementById("org-modal-name-input").value = divName;
+    document.getElementById("org-modal-target-group").classList.remove("hidden");
+    document.getElementById("org-modal-target-input").value = count;
+    document.getElementById("org-edit-modal").classList.remove("hidden");
+    document.getElementById("org-modal-name-input").focus();
+}
+
+function deleteDivision(encodedDept, encodedDiv) {
+    const dept = decodeURIComponent(encodedDept);
+    const divName = decodeURIComponent(encodedDiv);
+    if (!confirm(`คุณต้องการลบสังกัดกอง "${divName}" ออกจากฝ่าย "${dept}" ใช่หรือไม่?`)) {
+        return;
+    }
+    if (deptDivisions[dept]) {
+        delete deptDivisions[dept][divName];
+    }
+    deptHeadcounts = computeDeptHeadcounts(deptDivisions);
+    localStorage.setItem(DB_DIVISIONS_KEY, JSON.stringify(deptDivisions));
+    localStorage.setItem(DB_HEADCOUNT_KEY, JSON.stringify(deptHeadcounts));
+    renderHeadcountForm();
+    renderRegistrationUnits();
+    renderAffiliationRegistrationSummary();
+    showToast(`ลบกอง ${divName} เรียบร้อยแล้ว`);
+}
+
+function closeOrgModal() {
+    document.getElementById("org-edit-modal").classList.add("hidden");
+    document.getElementById("org-modal-form").reset();
+}
+
+function handleOrgModalSubmit(e) {
+    e.preventDefault();
+    const type = document.getElementById("org-modal-type").value;
+    const deptKey = document.getElementById("org-modal-dept-key").value;
+    const divKey = document.getElementById("org-modal-div-key").value;
+    const newName = document.getElementById("org-modal-name-input").value.trim();
+    const targetCount = Math.max(0, parseInt(document.getElementById("org-modal-target-input").value, 10) || 0);
+
+    if (!newName) {
+        showToast("กรุณาระบุชื่อสังกัด", true);
+        return;
+    }
+
+    if (type === "add_dept") {
+        if (deptDivisions[newName]) {
+            showToast("มีฝ่ายชื่อนี้อยู่ในระบบแล้ว", true);
+            return;
+        }
+        deptDivisions[newName] = { "ทั่วไป": 20 };
+        showToast(`เพิ่มสังกัดฝ่าย "${newName}" เรียบร้อยแล้ว`);
+    } else if (type === "edit_dept") {
+        if (newName !== deptKey) {
+            if (deptDivisions[newName]) {
+                showToast("มีฝ่ายชื่อนี้อยู่ในระบบแล้ว", true);
+                return;
+            }
+            deptDivisions[newName] = deptDivisions[deptKey] || {};
+            delete deptDivisions[deptKey];
+            
+            // Also update participants in memory if dept renamed
+            participants.forEach(p => {
+                if (p.dept === deptKey) p.dept = newName;
+            });
+            showToast(`เปลี่ยนชื่อฝ่ายเป็น "${newName}" เรียบร้อยแล้ว`);
+        }
+    } else if (type === "add_div") {
+        if (!deptDivisions[deptKey]) deptDivisions[deptKey] = {};
+        if (deptDivisions[deptKey][newName]) {
+            showToast("มีสังกัดกองชื่อนี้อยู่ในฝ่ายนี้แล้ว", true);
+            return;
+        }
+        deptDivisions[deptKey][newName] = targetCount;
+        showToast(`เพิ่มสังกัดกอง "${newName}" ในฝ่าย ${deptKey} เรียบร้อยแล้ว`);
+    } else if (type === "edit_div") {
+        if (!deptDivisions[deptKey]) deptDivisions[deptKey] = {};
+        if (newName !== divKey) {
+            delete deptDivisions[deptKey][divKey];
+            // Update participants in memory
+            participants.forEach(p => {
+                if (p.dept === deptKey && p.division === divKey) p.division = newName;
+            });
+        }
+        deptDivisions[deptKey][newName] = targetCount;
+        showToast(`แก้ไขสังกัดกอง "${newName}" เรียบร้อยแล้ว`);
+    }
+
+    deptHeadcounts = computeDeptHeadcounts(deptDivisions);
+    UNITS = Object.keys(deptDivisions);
+    if (!UNITS.includes("อื่นๆ")) UNITS.push("อื่นๆ");
+    localStorage.setItem(DB_DIVISIONS_KEY, JSON.stringify(deptDivisions));
+    localStorage.setItem(DB_HEADCOUNT_KEY, JSON.stringify(deptHeadcounts));
+
+    closeOrgModal();
+    renderHeadcountForm();
+    renderRegistrationUnits();
+    renderAffiliationRegistrationSummary();
 }
 
 async function saveHeadcountSettings() {
-    const newHeadcounts = {};
-    UNITS.forEach(u => {
-        const input = document.getElementById(`headcount-input-${encodeURIComponent(u)}`);
-        if (input) {
-            const val = parseInt(input.value, 10);
-            newHeadcounts[u] = (!isNaN(val) && val >= 0) ? val : 0;
-        } else {
-            newHeadcounts[u] = deptHeadcounts[u] || 0;
-        }
-    });
-
-    deptHeadcounts = newHeadcounts;
+    deptHeadcounts = computeDeptHeadcounts(deptDivisions);
+    localStorage.setItem(DB_DIVISIONS_KEY, JSON.stringify(deptDivisions));
     localStorage.setItem(DB_HEADCOUNT_KEY, JSON.stringify(deptHeadcounts));
 
     if (isOnlineDb) {
         try {
-            showToast("กำลังบันทึกจำนวนบุคลากรลงคลาวด์...");
+            showToast("กำลังบันทึกข้อมูลโครงสร้างและกำลังพลลงคลาวด์...");
             const response = await fetch("/api/headcount", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                     "x-admin-password": encodeURIComponent(adminPassword)
                 },
-                body: JSON.stringify({ headcount: deptHeadcounts })
+                body: JSON.stringify({ 
+                    divisions: deptDivisions,
+                    headcount: deptHeadcounts 
+                })
             });
             const resData = await response.json();
             if (response.ok && resData.ok) {
-                showToast("บันทึกจำนวนบุคลากรขึ้นระบบคลาวด์เรียบร้อยแล้ว ✅");
+                showToast("บันทึกข้อมูลโครงสร้างสังกัดและกำลังพลขึ้นระบบคลาวด์เรียบร้อยแล้ว ✅");
             } else {
                 showToast("บันทึกลงฐานข้อมูลคลาวด์ล้มเหลว: " + (resData.error || "ไม่ทราบสาเหตุ"), true);
             }
@@ -1638,20 +2036,27 @@ async function saveHeadcountSettings() {
             showToast("ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์เพื่อบันทึกได้", true);
         }
     } else {
-        showToast("บันทึกจำนวนบุคลากรในเครื่องเรียบร้อยแล้ว (ออฟไลน์) ✅");
+        showToast("บันทึกข้อมูลโครงสร้างสังกัดและกำลังพลในเครื่องเรียบร้อยแล้ว (ออฟไลน์) ✅");
     }
 
-    // Refresh calculations in summary table
+    // Refresh calculations across tables
+    renderRegistrationUnits();
     renderAffiliationRegistrationSummary();
 }
 
 function resetHeadcountSettings() {
-    if (!confirm("คุณต้องการรีเซ็ตจำนวนบุคลากรทุกฝ่ายกลับเป็นค่ามาตรฐานเริ่มต้น (รวม 1,700 คน) ใช่หรือไม่?")) {
+    if (!confirm("คุณต้องการคืนค่าโครงสร้างสังกัดฝ่าย-กองและกำลังพลทั้งหมดตามข้อมูลรูปภาพอัตรากำลังเริ่มต้น (รวม 1,990 คน) ใช่หรือไม่?")) {
         return;
     }
-    deptHeadcounts = { ...DEFAULT_HEADCOUNT };
+    deptDivisions = JSON.parse(JSON.stringify(DEFAULT_DIVISIONS));
+    deptHeadcounts = computeDeptHeadcounts(deptDivisions);
+    UNITS = Object.keys(deptDivisions);
+    if (!UNITS.includes("อื่นๆ")) UNITS.push("อื่นๆ");
+    localStorage.setItem(DB_DIVISIONS_KEY, JSON.stringify(deptDivisions));
     localStorage.setItem(DB_HEADCOUNT_KEY, JSON.stringify(deptHeadcounts));
     renderHeadcountForm();
+    renderRegistrationUnits();
+    renderAffiliationRegistrationSummary();
     saveHeadcountSettings();
 }
 
@@ -1724,12 +2129,44 @@ function renderAdminDashboard() {
     
     // Populate affiliation breakdown stats dropdown
     const statSelect = document.getElementById("admin-stat-unit-select");
-    if (statSelect && statSelect.children.length === 0) {
-        let options = `<option value="ทั้งหมด">ทั้งหมด (ทุกสังกัด)</option>`;
+    if (statSelect) {
+        const currentVal = statSelect.value || "ทั้งหมด";
+        let options = `<option value="ทั้งหมด">ทั้งหมด (ทุกฝ่าย)</option>`;
         UNITS.forEach(u => {
             options += `<option value="${u}">${u}</option>`;
         });
         statSelect.innerHTML = options;
+        if (UNITS.includes(currentVal) || currentVal === "ทั้งหมด") {
+            statSelect.value = currentVal;
+        } else {
+            statSelect.value = "ทั้งหมด";
+        }
+    }
+
+    const divSelect = document.getElementById("admin-stat-division-select");
+    if (divSelect) {
+        const curUnit = statSelect ? statSelect.value : "ทั้งหมด";
+        const curDiv = divSelect.value || "ทั้งหมด";
+        if (curUnit === "ทั้งหมด" || !deptDivisions[curUnit]) {
+            divSelect.innerHTML = `<option value="ทั้งหมด">ทั้งหมด (ทุกกอง)</option>`;
+            divSelect.disabled = true;
+            divSelect.style.opacity = "0.6";
+        } else {
+            const divs = Object.keys(deptDivisions[curUnit] || {});
+            let opts = `<option value="ทั้งหมด">ทั้งหมด (ทุกกอง ในฝ่าย ${curUnit})</option>`;
+            divs.forEach(d => {
+                opts += `<option value="${d}">${d}</option>`;
+            });
+            opts += `<option value="อื่นๆ">อื่นๆ</option>`;
+            divSelect.innerHTML = opts;
+            divSelect.disabled = false;
+            divSelect.style.opacity = "1";
+            if (divs.includes(curDiv) || curDiv === "ทั้งหมด" || curDiv === "อื่นๆ") {
+                divSelect.value = curDiv;
+            } else {
+                divSelect.value = "ทั้งหมด";
+            }
+        }
     }
     
     // Render Tabs content
@@ -1746,10 +2183,10 @@ function renderAffiliationRegistrationSummary() {
     
     tbody.innerHTML = "";
     
-    // Initialize statistics map for each unit
+    // Initialize statistics map for each unit and its divisions
     const stats = {};
     UNITS.forEach(u => {
-        stats[u] = { total: 0, completed: 0, inProgress: 0 };
+        stats[u] = { total: 0, completed: 0, inProgress: 0, divisions: {} };
     });
     
     // Total count of videos in system
@@ -1782,7 +2219,7 @@ function renderAffiliationRegistrationSummary() {
         }
         
         if (!stats[deptKey]) {
-            stats[deptKey] = { total: 0, completed: 0, inProgress: 0 };
+            stats[deptKey] = { total: 0, completed: 0, inProgress: 0, divisions: {} };
         }
         
         stats[deptKey].total++;
@@ -1790,6 +2227,18 @@ function renderAffiliationRegistrationSummary() {
             stats[deptKey].completed++;
         } else {
             stats[deptKey].inProgress++;
+        }
+
+        // Division stats
+        const divKey = (user.division && user.division.trim() && user.division !== "-") ? user.division.trim() : "ทั่วไป";
+        if (!stats[deptKey].divisions[divKey]) {
+            stats[deptKey].divisions[divKey] = { total: 0, completed: 0, inProgress: 0 };
+        }
+        stats[deptKey].divisions[divKey].total++;
+        if (isCompleted) {
+            stats[deptKey].divisions[divKey].completed++;
+        } else {
+            stats[deptKey].divisions[divKey].inProgress++;
         }
     });
     
@@ -1799,6 +2248,14 @@ function renderAffiliationRegistrationSummary() {
         const target = (deptHeadcounts[u] !== undefined) ? parseInt(deptHeadcounts[u], 10) : (DEFAULT_HEADCOUNT[u] || 0);
         const regCount = data.total;
         const compCount = data.completed;
+
+        const divMap = deptDivisions[u] || {};
+        const configuredDivs = Object.keys(divMap);
+        const userDivs = Object.keys(stats[u]?.divisions || {});
+        const allDivNames = Array.from(new Set([...configuredDivs, ...userDivs]));
+        const hasDivisions = allDivNames.length > 0;
+        const isExpanded = expandedDepts.has(u);
+        const encodedDept = encodeURIComponent(u);
 
         // % Registered
         let regPctStr = "—";
@@ -1830,7 +2287,16 @@ function renderAffiliationRegistrationSummary() {
 
         const tr = document.createElement("tr");
         tr.innerHTML = `
-            <td><strong>${u}</strong></td>
+            <td>
+                <div style="display: flex; align-items: center; gap: 0.45rem;">
+                    ${hasDivisions ? `
+                    <button type="button" class="btn-expand-dept" onclick="toggleDeptDrilldown('${encodedDept}')" title="${isExpanded ? 'ย่อรายละเอียดกอง' : 'คลิกดูรายละเอียดระดับกอง'}">
+                        <i data-lucide="${isExpanded ? 'minus' : 'plus'}" style="width: 12px; height: 12px;"></i>
+                    </button>` : `<span style="display:inline-block; width:22px;"></span>`}
+                    <strong style="font-size: 0.95rem;">${u}</strong>
+                    ${hasDivisions ? `<span style="font-size: 0.75rem; color: var(--text-secondary); font-weight: normal;">(${allDivNames.length} กอง)</span>` : ''}
+                </div>
+            </td>
             <td style="text-align: center; font-weight: 700; font-family: 'Outfit', sans-serif; color: var(--blue-d);">${target > 0 ? target.toLocaleString('en-US') : '<span style="color:var(--text-secondary)">—</span>'}</td>
             <td style="text-align: center; font-weight: 600; font-family: 'Outfit', sans-serif;">${regCount.toLocaleString('en-US')}</td>
             <td style="text-align: center; font-weight: 600; font-family: 'Outfit', sans-serif; color: var(--blue);">${regPctStr}</td>
@@ -1847,6 +2313,73 @@ function renderAffiliationRegistrationSummary() {
             <td style="text-align: center;">${evalBadge}</td>
         `;
         tbody.appendChild(tr);
+
+        // If expanded, render sub-rows for each division
+        if (isExpanded && hasDivisions) {
+            allDivNames.forEach(divName => {
+                const divTarget = divMap[divName] !== undefined ? parseInt(divMap[divName], 10) : 0;
+                const divData = stats[u]?.divisions?.[divName] || { total: 0, completed: 0, inProgress: 0 };
+                const divRegCount = divData.total;
+                const divCompCount = divData.completed;
+
+                let divRegPctStr = "—";
+                if (divTarget > 0) {
+                    divRegPctStr = ((divRegCount / divTarget) * 100).toFixed(1) + "%";
+                }
+
+                let divCompPctStr = "—";
+                let divCompPctVal = 0;
+                let divEvalBadge = `<span class="badge-eval badge-eval-none" style="font-size: 0.72rem; padding: 0.15rem 0.45rem;">—</span>`;
+                let divProgressFillClass = "none";
+
+                if (divTarget > 0) {
+                    divCompPctVal = (divCompCount / divTarget) * 100;
+                    divCompPctStr = divCompPctVal.toFixed(1) + "%";
+                    
+                    if (divCompPctVal >= 80) {
+                        divEvalBadge = `<span class="badge-eval badge-eval-high" style="font-size: 0.72rem; padding: 0.15rem 0.45rem;"><i data-lucide="check-circle-2" style="width: 11px; height: 11px;"></i> ดีเยี่ยม</span>`;
+                        divProgressFillClass = "high";
+                    } else if (divCompPctVal >= 50) {
+                        divEvalBadge = `<span class="badge-eval badge-eval-med" style="font-size: 0.72rem; padding: 0.15rem 0.45rem;"><i data-lucide="alert-triangle" style="width: 11px; height: 11px;"></i> ปานกลาง</span>`;
+                        divProgressFillClass = "med";
+                    } else {
+                        divEvalBadge = `<span class="badge-eval badge-eval-low" style="font-size: 0.72rem; padding: 0.15rem 0.45rem;"><i data-lucide="clock" style="width: 11px; height: 11px;"></i> ต้องติดตาม</span>`;
+                        divProgressFillClass = "low";
+                    }
+                }
+
+                const subTr = document.createElement("tr");
+                subTr.className = "subdivision-row";
+                subTr.innerHTML = `
+                    <td class="subdivision-cell-name">
+                        <span style="color: var(--text-primary); font-weight: 500;">${divName}</span>
+                    </td>
+                    <td style="text-align: center; font-weight: 600; font-family: 'Outfit', sans-serif; color: var(--blue-d); font-size: 0.85rem;">
+                        ${divTarget > 0 ? divTarget.toLocaleString('en-US') : '<span style="color:var(--text-secondary)">—</span>'}
+                    </td>
+                    <td style="text-align: center; font-weight: 500; font-family: 'Outfit', sans-serif; font-size: 0.85rem;">
+                        ${divRegCount.toLocaleString('en-US')}
+                    </td>
+                    <td style="text-align: center; font-weight: 500; font-family: 'Outfit', sans-serif; color: var(--blue); font-size: 0.85rem;">
+                        ${divRegPctStr}
+                    </td>
+                    <td style="text-align: center; color: #10b981; font-weight: 600; font-family: 'Outfit', sans-serif; font-size: 0.85rem;">
+                        ${divCompCount.toLocaleString('en-US')}
+                    </td>
+                    <td style="text-align: center;">
+                        ${divTarget > 0 ? `
+                        <div class="table-mini-progress">
+                            <span class="table-mini-progress-pct" style="color: ${divCompPctVal >= 80 ? '#10b981' : divCompPctVal >= 50 ? '#f59e0b' : '#ef4444'}; font-size: 0.8rem;">${divCompPctStr}</span>
+                            <div class="table-mini-progress-track" style="height: 5px;">
+                                <div class="table-mini-progress-fill ${divProgressFillClass}" style="width: ${Math.min(100, Math.max(0, divCompPctVal))}%;"></div>
+                            </div>
+                        </div>` : `<span style="color: var(--text-secondary);">—</span>`}
+                    </td>
+                    <td style="text-align: center;">${divEvalBadge}</td>
+                `;
+                tbody.appendChild(subTr);
+            });
+        }
     });
     
     // Calculate Grand Total
@@ -1910,6 +2443,16 @@ function renderAffiliationRegistrationSummary() {
     if (window.lucide) {
         lucide.createIcons();
     }
+}
+
+function toggleDeptDrilldown(encodedDept) {
+    const dept = decodeURIComponent(encodedDept);
+    if (expandedDepts.has(dept)) {
+        expandedDepts.delete(dept);
+    } else {
+        expandedDepts.add(dept);
+    }
+    renderAffiliationRegistrationSummary();
 }
 
 function renderAdminVideosTable() {
@@ -1986,19 +2529,67 @@ function toggleDescription(btn) {
     }
 }
 
+function handleAdminUnitFilterChange() {
+    const unitSelect = document.getElementById("admin-stat-unit-select");
+    const divSelect = document.getElementById("admin-stat-division-select");
+    const selectedUnit = unitSelect ? unitSelect.value : "ทั้งหมด";
+    
+    if (divSelect) {
+        if (selectedUnit === "ทั้งหมด" || !deptDivisions[selectedUnit]) {
+            divSelect.innerHTML = `<option value="ทั้งหมด">ทั้งหมด (ทุกกอง)</option>`;
+            divSelect.disabled = true;
+            divSelect.style.opacity = "0.6";
+        } else {
+            const divs = Object.keys(deptDivisions[selectedUnit] || {});
+            let opts = `<option value="ทั้งหมด">ทั้งหมด (ทุกกอง ในฝ่าย ${selectedUnit})</option>`;
+            divs.forEach(d => {
+                opts += `<option value="${d}">${d}</option>`;
+            });
+            opts += `<option value="อื่นๆ">อื่นๆ</option>`;
+            divSelect.innerHTML = opts;
+            divSelect.disabled = false;
+            divSelect.style.opacity = "1";
+        }
+        divSelect.value = "ทั้งหมด";
+    }
+    
+    renderAffiliationVideoStats();
+}
+
+function handleAdminDivisionFilterChange() {
+    renderAffiliationVideoStats();
+}
+
 function renderAdminParticipantsTable() {
     const tbody = document.getElementById("admin-users-table-body");
     tbody.innerHTML = "";
     
-    // Read selected unit filter from dropdown if present
+    // Read selected unit and division filters from dropdowns if present
     const statSelect = document.getElementById("admin-stat-unit-select");
+    const divSelect = document.getElementById("admin-stat-division-select");
     const selectedUnit = statSelect ? statSelect.value : "ทั้งหมด";
+    const selectedDivision = divSelect ? divSelect.value : "ทั้งหมด";
     
-    // Filter participants based on selected unit (robust matching for custom inputs under "อื่นๆ")
+    // Filter participants based on selected unit and division
     const filteredParticipants = participants.filter(p => {
-        if (selectedUnit === "ทั้งหมด") return true;
-        if (selectedUnit === "อื่นๆ") return p.dept === "อื่นๆ" || (p.dept && p.dept.startsWith("อื่นๆ:")) || !UNITS.includes(p.dept);
-        return p.dept === selectedUnit;
+        let matchDept = true;
+        if (selectedUnit !== "ทั้งหมด") {
+            if (selectedUnit === "อื่นๆ") {
+                matchDept = (p.dept === "อื่นๆ" || (p.dept && p.dept.startsWith("อื่นๆ:")) || !UNITS.includes(p.dept));
+            } else {
+                matchDept = (p.dept === selectedUnit);
+            }
+        }
+        if (!matchDept) return false;
+
+        if (selectedDivision !== "ทั้งหมด") {
+            if (selectedDivision === "อื่นๆ") {
+                const knownDivs = (selectedUnit && deptDivisions[selectedUnit]) ? Object.keys(deptDivisions[selectedUnit]) : [];
+                return p.division === "อื่นๆ" || (p.division && p.division.startsWith("อื่นๆ:")) || !knownDivs.includes(p.division);
+            }
+            return p.division === selectedDivision;
+        }
+        return true;
     });
     
     if (filteredParticipants.length === 0) {
@@ -2035,12 +2626,19 @@ function renderAdminParticipantsTable() {
         const watchedCount = userWatched.filter(id => videos.some(v => v.id === id)).length;
         const blobUrl = user._blobUrl || "";
         
+        const divisionBadge = (user.division && user.division !== "-") ? `<span class="badge-subdept">${user.division}</span>` : "";
+
         const tr = document.createElement("tr");
         tr.innerHTML = `
             <td style="white-space: nowrap;"><span class="category-pill" style="background-color: #fff8e0; border-color: rgba(253,197,0,0.25); color: var(--yellow-d); white-space: nowrap;">${user.emptype || 'พนักงาน'}</span></td>
             <td style="font-family: 'Outfit', sans-serif; font-weight: 500; white-space: nowrap;">${user.empId || '-'}</td>
             <td style="white-space: nowrap;"><strong>${user.name}</strong></td>
-            <td style="white-space: nowrap;">${user.dept}</td>
+            <td style="white-space: nowrap;">
+                <div style="display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;">
+                    <strong>${user.dept || '-'}</strong>
+                    ${divisionBadge}
+                </div>
+            </td>
             <td style="font-family: 'Outfit', sans-serif; font-size: 0.85rem; color: var(--text-secondary); white-space: nowrap;">${user.regTime}</td>
             <td style="white-space: nowrap;">
                 <span class="watched-status-pill ${watchedCount === totalCount && totalCount > 0 ? 'watched' : ''}" style="cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem; white-space: nowrap;" onclick="showParticipantDetails('${userKey}')" title="คลิกดูและจัดการสถานะรายบุคคล">
@@ -2066,17 +2664,35 @@ function renderAdminParticipantsTable() {
 }
 
 function renderAffiliationVideoStats() {
-    const selectedUnit = document.getElementById("admin-stat-unit-select").value;
+    const unitSelect = document.getElementById("admin-stat-unit-select");
+    const divSelect = document.getElementById("admin-stat-division-select");
+    const selectedUnit = unitSelect ? unitSelect.value : "ทั้งหมด";
+    const selectedDivision = divSelect ? divSelect.value : "ทั้งหมด";
     const tbody = document.getElementById("admin-stat-video-tbody");
     if (!tbody) return;
     
     tbody.innerHTML = "";
     
-    // Filter participants in this affiliation (robust matching for custom inputs under "อื่นๆ")
+    // Filter participants in this affiliation and division
     const filteredUsers = participants.filter(p => {
-        if (selectedUnit === "ทั้งหมด") return true;
-        if (selectedUnit === "อื่นๆ") return p.dept === "อื่นๆ" || (p.dept && p.dept.startsWith("อื่นๆ:")) || !UNITS.includes(p.dept);
-        return p.dept === selectedUnit;
+        let matchDept = true;
+        if (selectedUnit !== "ทั้งหมด") {
+            if (selectedUnit === "อื่นๆ") {
+                matchDept = (p.dept === "อื่นๆ" || (p.dept && p.dept.startsWith("อื่นๆ:")) || !UNITS.includes(p.dept));
+            } else {
+                matchDept = (p.dept === selectedUnit);
+            }
+        }
+        if (!matchDept) return false;
+
+        if (selectedDivision !== "ทั้งหมด") {
+            if (selectedDivision === "อื่นๆ") {
+                const knownDivs = (selectedUnit && deptDivisions[selectedUnit]) ? Object.keys(deptDivisions[selectedUnit]) : [];
+                return p.division === "อื่นๆ" || (p.division && p.division.startsWith("อื่นๆ:")) || !knownDivs.includes(p.division);
+            }
+            return p.division === selectedDivision;
+        }
+        return true;
     });
     
     // Deduplicate to guarantee accurate stats
@@ -2147,8 +2763,9 @@ function showParticipantDetails(userKey) {
                 <div><strong>ประเภทบุคลากร:</strong> ${user.emptype}</div>
                 <div><strong>รหัสพนักงาน:</strong> ${user.empId || '-'}</div>
                 <div style="grid-column: 1/-1;"><strong>ชื่อ - สกุล:</strong> ${user.name}</div>
-                <div><strong>สังกัด:</strong> ${user.dept}</div>
-                <div><strong>เวลาลงทะเบียน:</strong> ${user.regTime}</div>
+                <div><strong>สังกัดฝ่าย:</strong> ${user.dept || '-'}</div>
+                <div><strong>สังกัดกอง:</strong> ${user.division || '-'}</div>
+                <div style="grid-column: 1/-1;"><strong>เวลาลงทะเบียน:</strong> ${user.regTime}</div>
             </div>
         </div>
         
@@ -2439,7 +3056,7 @@ function exportParticipantsToCSV() {
     }
     
     // Header Row in Thai
-    let headers = ["ประเภทบุคลากร", "รหัสพนักงาน", "ชื่อ - สกุล", "สังกัด", "วันเวลาลงทะเบียน", "จำนวนวิดีโอที่ดูเสร็จสิ้น", "สถานะการชมคลังสื่อทั้งหมด"];
+    let headers = ["ประเภทบุคลากร", "รหัสพนักงาน", "ชื่อ - สกุล", "สังกัดฝ่าย", "สังกัดกอง", "วันเวลาลงทะเบียน", "จำนวนวิดีโอที่ดูเสร็จสิ้น", "สถานะการชมคลังสื่อทั้งหมด"];
     
     // Append a header column for each video in the library
     videos.forEach(v => {
@@ -2460,6 +3077,7 @@ function exportParticipantsToCSV() {
         const empIdText = user.empId || "-";
         const nameText = user.name || "-";
         const deptText = user.dept || "-";
+        const divisionText = user.division || "-";
         const regTimeText = user.regTime || "-";
         
         const row = [
@@ -2467,6 +3085,7 @@ function exportParticipantsToCSV() {
             empIdText,
             nameText,
             deptText,
+            divisionText,
             regTimeText,
             `${watchedCount}/${totalCount}`,
             statusText
@@ -2569,8 +3188,11 @@ function openParticipantEditModal(userKey) {
     
     document.getElementById("edit-name").value = user.name || "";
     
-    // Populate dropdown
+    // Populate dept dropdown
     const editDeptSelect = document.getElementById("edit-dept");
+    const otherDeptGroup = document.getElementById("edit-dept-other-group");
+    const otherDeptInput = document.getElementById("edit-dept-other");
+    
     if (editDeptSelect) {
         let options = "";
         UNITS.forEach(u => {
@@ -2579,23 +3201,92 @@ function openParticipantEditModal(userKey) {
         editDeptSelect.innerHTML = options;
         
         const isCustomDept = !UNITS.includes(user.dept);
-        const otherGroup = document.getElementById("edit-dept-other-group");
-        const otherInput = document.getElementById("edit-dept-other");
+        let selectedDeptValue = user.dept || UNITS[0];
         
         if (isCustomDept) {
             editDeptSelect.value = "อื่นๆ";
-            otherGroup.classList.remove("hidden");
-            otherInput.required = true;
-            otherInput.value = user.dept || "";
+            otherDeptGroup.classList.remove("hidden");
+            otherDeptInput.required = true;
+            otherDeptInput.value = user.dept || "";
+            selectedDeptValue = "อื่นๆ";
         } else {
-            editDeptSelect.value = user.dept || "อื่นๆ";
-            otherGroup.classList.add("hidden");
-            otherInput.required = false;
-            otherInput.value = "";
+            editDeptSelect.value = user.dept || UNITS[0];
+            otherDeptGroup.classList.add("hidden");
+            otherDeptInput.required = false;
+            otherDeptInput.value = "";
         }
+
+        editDeptSelect.onchange = function() {
+            if (this.value === "อื่นๆ") {
+                otherDeptGroup.classList.remove("hidden");
+                otherDeptInput.required = true;
+            } else {
+                otherDeptGroup.classList.add("hidden");
+                otherDeptInput.required = false;
+                otherDeptInput.value = "";
+            }
+            updateEditDivisionDropdown(this.value, "");
+        };
+
+        // Populate division dropdown according to selected department
+        updateEditDivisionDropdown(selectedDeptValue, user.division || "");
     }
     
     document.getElementById("participant-edit-modal").classList.remove("hidden");
+}
+
+function updateEditDivisionDropdown(selectedDept, currentDivision = "") {
+    const editDivSelect = document.getElementById("edit-division");
+    const editDivOtherGroup = document.getElementById("edit-division-other-group");
+    const editDivOtherInput = document.getElementById("edit-division-other");
+    if (!editDivSelect) return;
+
+    let knownDivs = [];
+    if (selectedDept && deptDivisions[selectedDept]) {
+        knownDivs = Object.keys(deptDivisions[selectedDept]);
+    }
+
+    let opts = "";
+    if (knownDivs.length > 0) {
+        knownDivs.forEach(d => {
+            opts += `<option value="${d}">${d}</option>`;
+        });
+    } else {
+        opts += `<option value="ทั่วไป">ทั่วไป</option>`;
+    }
+    opts += `<option value="อื่นๆ">อื่นๆ (ระบุ)</option>`;
+    editDivSelect.innerHTML = opts;
+
+    editDivSelect.onchange = function() {
+        if (this.value === "อื่นๆ") {
+            editDivOtherGroup.classList.remove("hidden");
+            editDivOtherInput.required = true;
+        } else {
+            editDivOtherGroup.classList.add("hidden");
+            editDivOtherInput.required = false;
+            editDivOtherInput.value = "";
+        }
+    };
+
+    // Determine initial selection
+    if (currentDivision) {
+        if (knownDivs.includes(currentDivision) || (knownDivs.length === 0 && currentDivision === "ทั่วไป")) {
+            editDivSelect.value = currentDivision;
+            editDivOtherGroup.classList.add("hidden");
+            editDivOtherInput.required = false;
+            editDivOtherInput.value = "";
+        } else {
+            editDivSelect.value = "อื่นๆ";
+            editDivOtherGroup.classList.remove("hidden");
+            editDivOtherInput.required = true;
+            editDivOtherInput.value = currentDivision.startsWith("อื่นๆ:") ? currentDivision.replace(/^อื่นๆ:\s*/, "") : currentDivision;
+        }
+    } else {
+        editDivSelect.value = knownDivs[0] || "ทั่วไป";
+        editDivOtherGroup.classList.add("hidden");
+        editDivOtherInput.required = false;
+        editDivOtherInput.value = "";
+    }
 }
 
 function closeParticipantEditModal() {
@@ -2625,6 +3316,12 @@ async function handleParticipantEditSave(e) {
     if (dept === "อื่นๆ") {
         dept = document.getElementById("edit-dept-other").value.trim();
     }
+
+    let division = document.getElementById("edit-division") ? document.getElementById("edit-division").value : "";
+    if (division === "อื่นๆ") {
+        const otherDiv = document.getElementById("edit-division-other").value.trim();
+        division = otherDiv ? `อื่นๆ: ${otherDiv}` : "อื่นๆ";
+    }
     
     if (!name || !dept) {
         showToast("กรุณากรอกข้อมูลให้ครบถ้วน", true);
@@ -2636,8 +3333,10 @@ async function handleParticipantEditSave(e) {
         empId,
         name,
         dept,
+        division: division || "-",
         regTime: originalUser.regTime,
-        watched: originalUser.watched || []
+        watched: originalUser.watched || [],
+        watchedAt: originalUser.watchedAt || {}
     };
     
     const newUserKey = empId || name;
