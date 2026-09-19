@@ -194,13 +194,28 @@ function renderRegistrationUnits() {
     unitsWrapper.innerHTML = UNITS.map(u => 
         `<label class="opt"><input type="radio" name="unit" value="${u}" ${currentChecked === u ? 'checked' : ''} required><span>${u}</span></label>`
     ).join("");
+
+    if (currentChecked) {
+        renderRegistrationDivisions(currentChecked);
+    }
 }
 
-function updateDivisionDropdown(selectedDept, defaultSelected = "") {
+function renderRegistrationDivisions(selectedDept, defaultSelected = "") {
     const divGroup = document.getElementById("division-group");
-    const divSelect = document.getElementById("reg-division-select");
+    const divsWrapper = document.getElementById("divisions-wrapper");
     const divOther = document.getElementById("reg-division-other");
-    if (!divGroup || !divSelect) return;
+    if (!divGroup || !divsWrapper) return;
+
+    if (!selectedDept) {
+        divGroup.classList.add("hidden");
+        divsWrapper.innerHTML = "";
+        if (divOther) {
+            divOther.classList.add("hidden");
+            divOther.required = false;
+            divOther.value = "";
+        }
+        return;
+    }
 
     divGroup.classList.remove("hidden");
     if (divOther) {
@@ -210,32 +225,34 @@ function updateDivisionDropdown(selectedDept, defaultSelected = "") {
     }
 
     const divObj = deptDivisions[selectedDept] || {};
-    const divNames = Object.keys(divObj);
+    let divNames = Object.keys(divObj);
+    if (divNames.length === 0) {
+        divNames = ["ทั่วไป"];
+    }
 
-    let html = `<option value="">-- โปรดเลือกสังกัดกอง --</option>`;
-    divNames.forEach(d => {
-        const isSel = (defaultSelected && defaultSelected === d) ? 'selected' : '';
-        html += `<option value="${d}" ${isSel}>${d}</option>`;
-    });
-    html += `<option value="อื่นๆ" ${(defaultSelected && !divNames.includes(defaultSelected) && defaultSelected !== "") ? 'selected' : ''}>อื่นๆ (ระบุ)</option>`;
-    divSelect.innerHTML = html;
+    const isCustomOther = defaultSelected && !divNames.includes(defaultSelected) && defaultSelected !== "";
 
-    divSelect.onchange = (e) => {
-        const isOtherDiv = e.target.value === "อื่นๆ";
-        if (divOther) {
-            divOther.classList.toggle("hidden", !isOtherDiv);
-            divOther.required = isOtherDiv;
-            if (isOtherDiv) divOther.focus();
-        }
-    };
+    let html = divNames.map(d => {
+        const isChecked = (defaultSelected && defaultSelected === d) ? 'checked' : '';
+        return `<label class="opt"><input type="radio" name="division" value="${d}" ${isChecked} required><span>${d}</span></label>`;
+    }).join("");
 
-    if (defaultSelected && !divNames.includes(defaultSelected) && defaultSelected !== "") {
+    const isOtherChecked = (isCustomOther || defaultSelected === "อื่นๆ") ? 'checked' : '';
+    html += `<label class="opt"><input type="radio" name="division" value="อื่นๆ" ${isOtherChecked} required><span>อื่นๆ</span></label>`;
+
+    divsWrapper.innerHTML = html;
+
+    if (isCustomOther) {
         if (divOther) {
             divOther.classList.remove("hidden");
             divOther.required = true;
-            divOther.value = defaultSelected;
+            divOther.value = defaultSelected.startsWith("อื่นๆ:") ? defaultSelected.replace(/^อื่นๆ:\s*/, "") : defaultSelected;
         }
     }
+}
+
+function updateDivisionDropdown(selectedDept, defaultSelected = "") {
+    renderRegistrationDivisions(selectedDept, defaultSelected);
 }
 
 // --- Initialize App ---
@@ -259,7 +276,27 @@ document.addEventListener("DOMContentLoaded", () => {
                     otherInput.required = isOther;
                     if (isOther) otherInput.focus();
                 }
-                updateDivisionDropdown(selectedDept);
+                renderRegistrationDivisions(selectedDept);
+            }
+        });
+    }
+
+    // Listener for dynamic divisions radio group
+    const divisionsWrapper = document.getElementById("divisions-wrapper");
+    if (divisionsWrapper) {
+        divisionsWrapper.addEventListener("change", (e) => {
+            const otherDivInput = document.getElementById("reg-division-other");
+            if (e.target.name === "division") {
+                const isOther = e.target.value === "อื่นๆ";
+                if (otherDivInput) {
+                    otherDivInput.classList.toggle("hidden", !isOther);
+                    otherDivInput.required = isOther;
+                    if (isOther) {
+                        otherDivInput.focus();
+                    } else {
+                        otherDivInput.value = "";
+                    }
+                }
             }
         });
     }
@@ -751,17 +788,27 @@ async function handleRegistration(e) {
     const unitEl = document.querySelector('input[name="unit"]:checked');
     let dept = unitEl ? unitEl.value : "";
     if (dept === "อื่นๆ") {
-        dept = document.getElementById("reg-dept-other").value.trim();
+        const otherDept = document.getElementById("reg-dept-other")?.value.trim() || "";
+        if (!otherDept) {
+            showToast("กรุณาระบุสังกัดฝ่ายอื่นๆ", true);
+            return;
+        }
+        dept = `อื่นๆ: ${otherDept}`;
     }
 
-    const divSelect = document.getElementById("reg-division-select");
-    let division = divSelect ? divSelect.value : "";
+    const divRadio = document.querySelector('input[name="division"]:checked');
+    let division = divRadio ? divRadio.value : "";
     if (division === "อื่นๆ") {
-        division = document.getElementById("reg-division-other").value.trim();
+        const otherDiv = document.getElementById("reg-division-other")?.value.trim() || "";
+        if (!otherDiv) {
+            showToast("กรุณาระบุสังกัดกองอื่นๆ", true);
+            return;
+        }
+        division = `อื่นๆ: ${otherDiv}`;
     }
     
-    if (!emptype || !name || !dept || (!division && dept !== "อื่นๆ")) {
-        showToast("กรุณากรอกข้อมูลให้ครบถ้วน รวมถึงสังกัดกอง", true);
+    if (!emptype || !name || !dept || !division) {
+        showToast("กรุณากรอกข้อมูลให้ครบถ้วน รวมถึงสังกัดฝ่ายและกอง", true);
         return;
     }
     
@@ -874,10 +921,15 @@ async function handleRegistration(e) {
     if (divGroup) {
         divGroup.classList.add("hidden");
     }
+    const divsWrapper = document.getElementById("divisions-wrapper");
+    if (divsWrapper) {
+        divsWrapper.innerHTML = "";
+    }
     const divOtherInput = document.getElementById("reg-division-other");
     if (divOtherInput) {
         divOtherInput.classList.add("hidden");
         divOtherInput.required = false;
+        divOtherInput.value = "";
     }
 }
 
