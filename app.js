@@ -1188,7 +1188,15 @@ function renderUserLobby() {
     document.getElementById("user-progress-text").innerText = `${watchedCount}/${totalVideos} คลิป`;
     
     const progressPercent = totalVideos > 0 ? (watchedCount / totalVideos) * 100 : 0;
-    document.getElementById("user-progress-bar").style.width = `${progressPercent}%`;
+    const progressBar = document.getElementById("user-progress-bar");
+    if (progressBar) {
+        progressBar.style.width = `${progressPercent}%`;
+        if (progressPercent >= 100) {
+            progressBar.style.background = "linear-gradient(90deg, #10b981 0%, #059669 100%)";
+        } else {
+            progressBar.style.background = "linear-gradient(90deg, var(--yellow) 0%, var(--yellow-d) 100%)";
+        }
+    }
     
     // Render grid
     const grid = document.getElementById("video-grid");
@@ -1575,10 +1583,15 @@ function localWatchFallback(userKey, videoId, isNewWatch) {
     }
 }
 
-// --- Video Progress Tracker ---
+// --- Video Progress Tracker & Post-Watch Flows ---
+let isMarkingWatched = false;
+let pendingNextVideo = null;
+
 async function markCurrentVideoWatched() {
     if (!currentUser || !currentPlayingVideo) return;
+    if (isMarkingWatched) return; // Prevent double-trigger from multiple clicks or events
     
+    isMarkingWatched = true;
     const userKey = getUserKey(currentUser);
     const videoId = currentPlayingVideo.id;
     const btn = document.getElementById("mark-watched-btn");
@@ -1589,11 +1602,13 @@ async function markCurrentVideoWatched() {
         btn.innerHTML = `<span class="animate-spin" style="display:inline-block; margin-right: 6px;">⏳</span> กำลังบันทึกข้อมูล...`;
     }
     
+    let isNewWatch = false;
+
     try {
         if (!watchedLogs[userKey]) {
             watchedLogs[userKey] = [];
         }
-        const isNewWatch = !watchedLogs[userKey].includes(videoId);
+        isNewWatch = !watchedLogs[userKey].includes(videoId);
         const watchTime = getCurrentTimestamp();
 
         // 1. Instantly update local state to preserve previously watched videos
@@ -1703,7 +1718,130 @@ async function markCurrentVideoWatched() {
         if (adminSec && !adminSec.classList.contains("hidden") && typeof refreshAdminDashboard === "function") {
             refreshAdminDashboard();
         }
+        isMarkingWatched = false;
+
+        // Trigger Auto-Next Prompt (แนวทาง A) or Completion Modal (แนวทาง C)
+        handlePostWatchFlow();
     }
+}
+
+// Post-Watch Flow Coordinator (Options A & C)
+function handlePostWatchFlow() {
+    if (!currentUser) return;
+    
+    const userKey = getUserKey(currentUser);
+    const userWatched = (currentUser && Array.isArray(currentUser.watched) && currentUser.watched.length > 0)
+        ? currentUser.watched
+        : (watchedLogs[userKey] || []);
+    
+    // Filter unwatched videos
+    const unwatchedVideos = videos.filter(v => !userWatched.includes(v.id));
+    
+    if (unwatchedVideos.length > 0) {
+        // Option A: There are remaining videos to watch -> prompt immediately
+        pendingNextVideo = unwatchedVideos[0];
+        setTimeout(() => {
+            showNextVideoPrompt(pendingNextVideo, unwatchedVideos.length);
+        }, 220);
+    } else if (videos.length > 0) {
+        // Option C: All videos completed (100%) -> celebratory trophy modal
+        setTimeout(() => {
+            showCompletionModal();
+        }, 220);
+    }
+}
+
+// --- Option A: Next Video Prompt Modal ---
+function showNextVideoPrompt(nextVideo, remainingCount) {
+    if (!nextVideo) return;
+    pendingNextVideo = nextVideo;
+    
+    const modal = document.getElementById("next-video-modal");
+    if (!modal) return;
+    
+    const countEl = document.getElementById("next-video-remaining-count");
+    if (countEl) {
+        countEl.innerText = `${remainingCount} คลิป`;
+    }
+    
+    const titleEl = document.getElementById("next-video-title");
+    if (titleEl) titleEl.innerText = nextVideo.title;
+    
+    const catEl = document.getElementById("next-video-category");
+    if (catEl) catEl.innerText = `หมวดหมู่: ${nextVideo.category || "ทั่วไป"}`;
+    
+    const durEl = document.getElementById("next-video-duration");
+    if (durEl) durEl.innerText = nextVideo.duration || "0:00";
+    
+    modal.classList.remove("hidden");
+    lucide.createIcons();
+}
+
+function closeNextVideoPrompt() {
+    const modal = document.getElementById("next-video-modal");
+    if (modal) modal.classList.add("hidden");
+    pendingNextVideo = null;
+}
+
+function playNextVideoImmediately() {
+    const nextVideo = pendingNextVideo;
+    closeNextVideoPrompt();
+    if (nextVideo && nextVideo.id) {
+        setTimeout(() => {
+            playVideo(nextVideo.id);
+        }, 150);
+    }
+}
+
+// --- Option C: Completion Modal (100% Celebration) ---
+function showCompletionModal() {
+    if (!currentUser) return;
+    const modal = document.getElementById("completion-modal");
+    if (!modal) return;
+    
+    const nameEl = document.getElementById("completion-user-name");
+    if (nameEl) nameEl.innerText = currentUser.name || "คุณผู้ใช้งาน";
+    
+    const deptEl = document.getElementById("completion-user-dept");
+    if (deptEl) {
+        const deptStr = currentUser.dept || "-";
+        const divStr = currentUser.division ? ` / ${currentUser.division}` : "";
+        deptEl.innerText = `สังกัด: ${deptStr}${divStr}`;
+    }
+    
+    // Populate checklist of completed videos
+    const checklist = document.getElementById("completion-checklist");
+    if (checklist) {
+        checklist.innerHTML = "";
+        videos.forEach(v => {
+            const watchedTime = (currentUser.watchedAt && currentUser.watchedAt[v.id]) 
+                ? currentUser.watchedAt[v.id] 
+                : (currentUser.regTime || "-");
+                
+            const item = document.createElement("div");
+            item.className = "completion-checklist-item";
+            item.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <div style="width: 22px; height: 22px; border-radius: 50%; background: #10b981; color: #fff; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                        <i data-lucide="check" style="width: 14px; height: 14px;"></i>
+                    </div>
+                    <span style="font-size: 0.88rem; font-weight: 600; color: var(--text-main);">${v.title}</span>
+                </div>
+                <div style="font-size: 0.75rem; color: var(--text-secondary); margin-left: 1.85rem; margin-top: 0.15rem; font-family: 'Outfit', sans-serif;">
+                    รับชมสำเร็จเมื่อ: ${watchedTime}
+                </div>
+            `;
+            checklist.appendChild(item);
+        });
+    }
+    
+    modal.classList.remove("hidden");
+    lucide.createIcons();
+}
+
+function closeCompletionModal() {
+    const modal = document.getElementById("completion-modal");
+    if (modal) modal.classList.add("hidden");
 }
 
 // --- Admin Authentication ---

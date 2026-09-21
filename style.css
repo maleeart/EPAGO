@@ -2063,5 +2063,71 @@ body.admin-mode .hero-banner {
     border-top: 1px dashed var(--border-color);
 }
 
+/* --- Auto-Next Video & Completion Modal Styles --- */
+@keyframes bounceGentle {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-8px);
+    }
+}
 
+.bounce-gentle {
+    animation: bounceGentle 2.6s ease-in-out infinite;
+}
 
+@keyframes pulseGlow {
+    0%, 100% {
+        box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+        transform: scale(1);
+    }
+    50% {
+        box-shadow: 0 6px 24px rgba(16, 185, 129, 0.75);
+        transform: scale(1.015);
+    }
+}
+
+.pulse-btn {
+    animation: pulseGlow 2.2s infinite ease-in-out;
+}
+
+.prompt-modal-card,
+.completion-modal-card {
+    border-top: 6px solid var(--primary);
+    position: relative;
+    overflow: hidden;
+}
+
+.completion-modal-card {
+    border-top-color: #10b981;
+}
+
+.completion-checklist-item {
+    background: #ffffff;
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    border-radius: 8px;
+    padding: 0.6rem 0.85rem;
+    transition: all var(--transition-fast);
+}
+
+.completion-checklist-item:hover {
+    border-color: #a7f3d0;
+    background: #f0fdf4;
+}
+
+.next-video-preview:hover {
+    border-color: var(--primary) !important;
+    background: rgba(238, 242, 255, 0.6) !important;
+}
+
+@media (max-width: 640px) {
+    .prompt-modal-card,
+    .completion-modal-card {
+        padding: 1.5rem 1rem !important;
+    }
+    .prompt-mascot-wrapper img,
+    .completion-mascot-wrapper img {
+        height: 100px !important;
+    }
+}

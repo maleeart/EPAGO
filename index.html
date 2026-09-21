@@ -36,7 +36,7 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <!-- Official YouTube IFrame Player API for guaranteed completion tracking -->
     <script src="https://www.youtube.com/iframe_api"></script>
-    <link rel="stylesheet" href="style.css?v=2.9">
+    <link rel="stylesheet" href="style.css?v=3.0">
 </head>
 <body>
     <!-- Background Decor Elements -->
@@ -630,6 +630,93 @@
         </div>
     </div>
 
+    <!-- NEXT VIDEO PROMPT MODAL (AUTO-NEXT PROMPT) -->
+    <div id="next-video-modal" class="modal-overlay hidden" onclick="if (event.target === this) closeNextVideoPrompt()">
+        <div class="glass-card modal-card prompt-modal-card text-center" style="max-width: 480px; padding: 2rem 1.5rem;">
+            <button class="modal-close" onclick="closeNextVideoPrompt()">
+                <i data-lucide="x"></i>
+            </button>
+            <div class="prompt-mascot-wrapper" style="margin-bottom: 0.85rem;">
+                <img src="ENGY PNG/engy 26.png" alt="ENGY Cheering" style="height: 120px; width: auto; object-fit: contain; filter: drop-shadow(0 8px 16px rgba(0,0,0,0.15));" class="bounce-gentle">
+            </div>
+            <span class="badge-pill-success" style="display: inline-flex; align-items: center; gap: 0.35rem; background: #ecfdf5; color: #059669; border: 1px solid #a7f3d0; border-radius: 9999px; padding: 0.35rem 0.85rem; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.75rem;">
+                <i data-lucide="check-circle" style="width: 15px; height: 15px;"></i> บันทึกคลิปก่อนหน้าสำเร็จแล้ว!
+            </span>
+            <h3 style="font-size: 1.35rem; font-weight: 700; color: var(--text-main); margin-bottom: 0.35rem;">
+                เหลืออีกเพียง <span id="next-video-remaining-count" style="color: var(--primary); font-weight: 800;">1 คลิป</span> จะผ่านเกณฑ์!
+            </h3>
+            <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1.25rem;">
+                รับชมคลิปถัดไปต่อเนื่องเพื่อบันทึกประวัติการอบรมครบ 100% ทันที
+            </p>
+
+            <!-- Next Video Preview Card -->
+            <div id="next-video-preview-card" class="next-video-preview" onclick="playNextVideoImmediately()" style="background: rgba(241, 245, 249, 0.75); border: 1.5px dashed rgba(27, 76, 158, 0.25); border-radius: 0.75rem; padding: 1rem; margin-bottom: 1.35rem; text-align: left; display: flex; align-items: center; gap: 0.85rem; cursor: pointer;">
+                <div class="next-video-preview-icon" style="width: 46px; height: 46px; border-radius: 0.5rem; background: var(--primary); display: flex; align-items: center; justify-content: center; color: #fff; flex-shrink: 0; box-shadow: 0 4px 10px rgba(27,76,158,0.25);">
+                    <i data-lucide="play" style="width: 20px; height: 20px;"></i>
+                </div>
+                <div style="flex: 1; min-width: 0;">
+                    <div style="font-size: 0.75rem; font-weight: 600; color: var(--primary); margin-bottom: 0.15rem;" id="next-video-category">หมวดหมู่</div>
+                    <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="next-video-title">ชื่อคลิปวิดีโอถัดไป</div>
+                    <div style="font-size: 0.78rem; color: var(--text-secondary); display: flex; align-items: center; gap: 0.25rem; margin-top: 0.2rem;">
+                        <i data-lucide="clock" style="width: 12px; height: 12px;"></i> ความยาว <span id="next-video-duration">0:00</span>
+                    </div>
+                </div>
+                <i data-lucide="chevron-right" style="color: var(--primary); width: 20px; height: 20px; flex-shrink: 0;"></i>
+            </div>
+
+            <!-- Action Buttons -->
+            <div style="display: flex; flex-direction: column; gap: 0.65rem;">
+                <button id="next-video-play-btn" class="btn btn-emerald btn-block pulse-btn" onclick="playNextVideoImmediately()" style="padding: 0.85rem; font-size: 1rem; font-weight: 700; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);">
+                    <i data-lucide="play-circle"></i> รับชมคลิปถัดไปทันที
+                </button>
+                <button type="button" class="btn btn-outline btn-block" onclick="closeNextVideoPrompt()" style="padding: 0.65rem; font-size: 0.88rem;">
+                    กลับสู่หน้าหลัก / ดูภายหลัง
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- COMPLETION MODAL (100% COMPLETE CELEBRATION) -->
+    <div id="completion-modal" class="modal-overlay hidden" onclick="if (event.target === this) closeCompletionModal()">
+        <div class="glass-card modal-card completion-modal-card text-center" style="max-width: 500px; padding: 2.25rem 1.75rem;">
+            <button class="modal-close" onclick="closeCompletionModal()">
+                <i data-lucide="x"></i>
+            </button>
+            <div class="completion-mascot-wrapper" style="margin-bottom: 0.85rem; position: relative; display: inline-block;">
+                <img src="ENGY PNG/engy 5.png" alt="ENGY Trophy" style="height: 125px; width: auto; object-fit: contain; filter: drop-shadow(0 10px 20px rgba(245, 158, 11, 0.25));" class="bounce-gentle">
+                <span class="trophy-badge" style="position: absolute; bottom: 0; right: -5px; background: #f59e0b; color: #fff; width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(245, 158, 11, 0.4); border: 2px solid #fff;">
+                    <i data-lucide="award" style="width: 18px; height: 18px;"></i>
+                </span>
+            </div>
+            <div style="display: inline-flex; align-items: center; gap: 0.35rem; background: #ecfdf5; color: #059669; border: 1px solid #a7f3d0; border-radius: 9999px; padding: 0.35rem 0.95rem; font-size: 0.85rem; font-weight: 700; margin-bottom: 0.75rem;">
+                <i data-lucide="check-check" style="width: 16px; height: 16px;"></i> ผ่านการอบรมครบ 100% แล้ว
+            </div>
+            <h3 style="font-size: 1.45rem; font-weight: 800; color: var(--text-main); margin-bottom: 0.35rem;">
+                🎉 ยินดีด้วยครับ!
+            </h3>
+            <p style="font-size: 0.95rem; color: var(--text-main); font-weight: 600; margin-bottom: 0.2rem;">
+                <span id="completion-user-name" style="color: var(--primary);">คุณผู้ใช้งาน</span>
+            </p>
+            <p style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 1.2rem;" id="completion-user-dept">
+                สังกัด: ฝ่าย/กอง
+            </p>
+
+            <!-- Video Completed Checklist -->
+            <div id="completion-checklist" style="background: rgba(248, 250, 252, 0.85); border: 1px solid rgba(226, 232, 240, 0.9); border-radius: 0.75rem; padding: 0.85rem 1rem; margin-bottom: 1.25rem; text-align: left; display: flex; flex-direction: column; gap: 0.55rem;">
+                <!-- Filled dynamically by JS with watched videos -->
+            </div>
+
+            <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 0.5rem; padding: 0.65rem 0.85rem; margin-bottom: 1.35rem; display: flex; align-items: center; gap: 0.5rem; color: #1e40af; font-size: 0.82rem; text-align: left;">
+                <i data-lucide="shield-check" style="width: 20px; height: 20px; color: #3b82f6; flex-shrink: 0;"></i>
+                <span>ระบบได้บันทึกประวัติการเข้าร่วมกิจกรรมของท่านลงฐานข้อมูลเรียบร้อยแล้ว ขอบคุณที่ร่วมเป็นส่วนหนึ่งในการประหยัดพลังงานครับ</span>
+            </div>
+
+            <button type="button" class="btn btn-primary btn-block" onclick="closeCompletionModal()" style="padding: 0.85rem; font-size: 1rem; font-weight: 700; box-shadow: 0 4px 14px rgba(27, 76, 158, 0.3);">
+                ตกลง / กลับสู่หน้าหลัก <i data-lucide="check"></i>
+            </button>
+        </div>
+    </div>
+
     <!-- ADD/EDIT VIDEO MODAL -->
     <div id="video-edit-modal" class="modal-overlay hidden">
         <div class="glass-card modal-card">
@@ -805,6 +892,6 @@
             lucide.createIcons();
         });
     </script>
-    <script src="app.js?v=2.9"></script>
+    <script src="app.js?v=3.0"></script>
 </body>
 </html>
