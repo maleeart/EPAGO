@@ -62,28 +62,16 @@ const DEFAULT_VIDEOS = [
     }
 ];
 
-// Default Participants Seed Data for Demo
-const DEFAULT_PARTICIPANTS = [
-    {
-        emptype: "พนักงาน",
-        empId: "EMP001",
-        name: "นายสมชาย รักษ์พลังงาน",
-        dept: "ฝ่ายเทคโนโลยีสารสนเทศ",
-        regTime: "2026-08-11 08:30"
-    },
-    {
-        emptype: "ลูกจ้าง",
-        empId: "",
-        name: "นางสาวสมหญิง ประหยัดดี",
-        dept: "ฝ่ายการเงินและบัญชี",
-        regTime: "2026-08-11 09:15"
-    }
-];
+// Default Participants Seed Data (Empty in production)
+const DEFAULT_PARTICIPANTS = [];
+const DEFAULT_WATCHED_LOGS = {};
 
-const DEFAULT_WATCHED_LOGS = {
-    "EMP001": ["vid-1"],
-    "นางสาวสมหญิง ประหยัดดี": ["vid-1"]
-};
+function isMockParticipant(p) {
+    if (!p) return false;
+    const empId = String(p.empId || "").trim().toUpperCase();
+    const name = String(p.name || "").trim();
+    return empId === "EMP001" || name.includes("สมชาย รักษ์พลังงาน") || name.includes("สมหญิง ประหยัดดี");
+}
 
 // --- App State ---
 const DB_HEADCOUNT_KEY = "energysave_headcount";
@@ -475,13 +463,14 @@ async function syncCurrentUserWatchedProgress() {
                 emptype: currentUser.emptype,
                 name: currentUser.name,
                 empId: currentUser.empId,
-                dept: currentUser.dept
+                dept: currentUser.dept,
+                division: currentUser.division
             })
         });
         const resData = await response.json().catch(() => ({}));
         if (response.ok && resData.ok && resData.user) {
             const cloudUser = resData.user;
-            const userKey = currentUser.empId || currentUser.name;
+            const userKey = (currentUser.empId && currentUser.empId !== "-") ? currentUser.empId : currentUser.name;
             const localWatched = Array.isArray(currentUser.watched) ? currentUser.watched : (watchedLogs[userKey] || []);
             const cloudWatched = Array.isArray(cloudUser.watched) ? cloudUser.watched : [];
 
@@ -497,6 +486,7 @@ async function syncCurrentUserWatchedProgress() {
                             name: currentUser.name,
                             empId: currentUser.empId,
                             dept: currentUser.dept,
+                            division: currentUser.division,
                             regTime: currentUser.regTime,
                             videoId: vId
                         })
@@ -584,15 +574,16 @@ async function migrateLocalDataToCloud() {
     try {
         const localParts = JSON.parse(localParticipantsRaw) || [];
         const localWatched = JSON.parse(localWatchedRaw) || {};
+        const realParts = localParts.filter(p => !isMockParticipant(p));
         
-        if (localParts.length === 0) {
+        if (realParts.length === 0) {
             localStorage.setItem("db_migrated_v1.4_v2", "true");
             return;
         }
         
-        console.log("EPAGO: Migrating " + localParts.length + " local participants to cloud database...");
+        console.log("EPAGO: Migrating " + realParts.length + " local participants to cloud database...");
         
-        for (const part of localParts) {
+        for (const part of realParts) {
             const userKey = part.empId || part.name;
             const watched = localWatched[userKey] || [];
             
@@ -619,6 +610,36 @@ async function migrateLocalDataToCloud() {
 
 // Seed data storage if empty
 function initDatabase() {
+    // Clean legacy mock users from local storage if present
+    try {
+        const rawParts = localStorage.getItem(DB_USERS_KEY);
+        if (rawParts) {
+            const parsed = JSON.parse(rawParts);
+            if (Array.isArray(parsed)) {
+                const cleaned = parsed.filter(p => !isMockParticipant(p));
+                localStorage.setItem(DB_USERS_KEY, JSON.stringify(cleaned));
+            }
+        }
+        const rawWatched = localStorage.getItem(DB_WATCHED_KEY);
+        if (rawWatched) {
+            const parsedW = JSON.parse(rawWatched);
+            if (parsedW && typeof parsedW === "object") {
+                delete parsedW["EMP001"];
+                delete parsedW["นายสมชาย รักษ์พลังงาน"];
+                delete parsedW["นางสาวสมหญิง ประหยัดดี"];
+                localStorage.setItem(DB_WATCHED_KEY, JSON.stringify(parsedW));
+            }
+        }
+        const rawCur = localStorage.getItem(DB_CURRENT_USER_KEY);
+        if (rawCur) {
+            const cur = JSON.parse(rawCur);
+            if (isMockParticipant(cur)) {
+                localStorage.removeItem(DB_CURRENT_USER_KEY);
+                currentUser = null;
+            }
+        }
+    } catch (e) {}
+
     // Database Versioning / Force Reset for default videos
     const DB_VERSION = "v2.2";
     if (localStorage.getItem("db_version") !== DB_VERSION) {
@@ -1229,6 +1250,8 @@ function renderUserLobby() {
     lucide.createIcons();
 }
 
+let currentYTPlayer = null;
+
 // --- Video Player Functions ---
 function playVideo(videoId) {
     const video = videos.find(v => v.id === videoId);
@@ -1246,11 +1269,7 @@ function playVideo(videoId) {
         // Parse YouTube URL
         const ytId = getYoutubeId(video.url);
         if (ytId) {
-            embedContainer.innerHTML = `
-                <iframe src="https://www.youtube.com/embed/${ytId}?autoplay=1&enablejsapi=1" 
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                        allowfullscreen></iframe>
-            `;
+            playYouTubeVideo(ytId);
         } else {
             renderSimulatedPlayer(video);
         }
@@ -1277,6 +1296,85 @@ function playVideo(videoId) {
     
     // Show Modal
     document.getElementById("video-player-modal").classList.remove("hidden");
+}
+
+function playYouTubeVideo(ytId) {
+    const embedContainer = document.getElementById("video-embed-container");
+    embedContainer.innerHTML = `<div id="yt-player-target" style="width: 100%; height: 100%;"></div>`;
+    
+    if (currentYTPlayer && typeof currentYTPlayer.destroy === "function") {
+        try { currentYTPlayer.destroy(); } catch (e) {}
+        currentYTPlayer = null;
+    }
+    
+    // Check if YT IFrame API is loaded
+    if (window.YT && window.YT.Player) {
+        initYTPlayerInstance(ytId);
+    } else {
+        let attempts = 0;
+        const checkYT = setInterval(() => {
+            attempts++;
+            if (window.YT && window.YT.Player) {
+                clearInterval(checkYT);
+                initYTPlayerInstance(ytId);
+            } else if (attempts > 20) {
+                clearInterval(checkYT);
+                renderFallbackIframe(ytId);
+            }
+        }, 100);
+    }
+}
+
+function initYTPlayerInstance(ytId) {
+    try {
+        currentYTPlayer = new YT.Player("yt-player-target", {
+            videoId: ytId,
+            width: "100%",
+            height: "100%",
+            playerVars: {
+                autoplay: 1,
+                enablejsapi: 1,
+                rel: 0,
+                origin: window.location.origin
+            },
+            events: {
+                onReady: (event) => {
+                    try { event.target.playVideo(); } catch (e) {}
+                },
+                onStateChange: (event) => {
+                    // YT.PlayerState.ENDED is 0
+                    if (event.data === YT.PlayerState.ENDED || event.data === 0) {
+                        if (currentPlayingVideo) {
+                            markCurrentVideoWatched();
+                            showToast("คุณรับชมคลิป YouTube จบแล้ว ระบบบันทึกประวัติให้อัตโนมัติ 🎉");
+                        }
+                    }
+                }
+            }
+        });
+    } catch (err) {
+        console.warn("YT.Player init failed, using iframe fallback:", err);
+        renderFallbackIframe(ytId);
+    }
+}
+
+function renderFallbackIframe(ytId) {
+    const embedContainer = document.getElementById("video-embed-container");
+    embedContainer.innerHTML = `
+        <iframe id="yt-iframe-fallback"
+                src="https://www.youtube.com/embed/${ytId}?autoplay=1&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}" 
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                allowfullscreen
+                style="width: 100%; height: 100%; border: none;"></iframe>
+    `;
+    const iframe = document.getElementById("yt-iframe-fallback");
+    if (iframe) {
+        iframe.onload = () => {
+            try {
+                iframe.contentWindow.postMessage(JSON.stringify({ event: "listening" }), "*");
+            } catch (e) {}
+        };
+    }
 }
 
 function getYoutubeId(url) {
@@ -1410,6 +1508,10 @@ function formatSeconds(secs) {
 function closeVideoPlayer() {
     // Stop intervals / videos
     if (playSimInterval) clearInterval(playSimInterval);
+    if (currentYTPlayer && typeof currentYTPlayer.destroy === "function") {
+        try { currentYTPlayer.destroy(); } catch (e) {}
+        currentYTPlayer = null;
+    }
     document.getElementById("video-embed-container").innerHTML = "";
     document.getElementById("video-player-modal").classList.add("hidden");
     currentPlayingVideo = null;
@@ -1417,7 +1519,10 @@ function closeVideoPlayer() {
 
 function localWatchFallback(userKey, videoId, isNewWatch) {
     if (isNewWatch) {
-        watchedLogs[userKey].push(videoId);
+        if (!watchedLogs[userKey]) watchedLogs[userKey] = [];
+        if (!watchedLogs[userKey].includes(videoId)) {
+            watchedLogs[userKey].push(videoId);
+        }
         localStorage.setItem(DB_WATCHED_KEY, JSON.stringify(watchedLogs));
         
         const watchTime = getCurrentTimestamp();
@@ -1425,10 +1530,10 @@ function localWatchFallback(userKey, videoId, isNewWatch) {
         // Sync to local participants state
         if (currentUser) {
             const pIndex = participants.findIndex(p => {
-                if (currentUser.empId) {
+                if (currentUser.empId && currentUser.empId !== "-") {
                     return p.empId && p.empId.toUpperCase() === currentUser.empId.toUpperCase();
                 } else {
-                    return (!p.empId || p.empId === "") && normalizeName(p.name) === normalizeName(currentUser.name);
+                    return (!p.empId || p.empId === "" || p.empId === "-") && normalizeName(p.name) === normalizeName(currentUser.name);
                 }
             });
             if (pIndex !== -1) {
@@ -1461,70 +1566,88 @@ function localWatchFallback(userKey, videoId, isNewWatch) {
 async function markCurrentVideoWatched() {
     if (!currentUser || !currentPlayingVideo) return;
     
-    const userKey = currentUser.empId || currentUser.name;
+    const userKey = (currentUser.empId && currentUser.empId !== "-") ? currentUser.empId : currentUser.name;
     const videoId = currentPlayingVideo.id;
-    
-    if (!watchedLogs[userKey]) {
-        watchedLogs[userKey] = [];
+    const btn = document.getElementById("mark-watched-btn");
+    const originalBtnHtml = btn ? btn.innerHTML : "";
+
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<span class="animate-spin" style="display:inline-block; margin-right: 6px;">⏳</span> กำลังบันทึกข้อมูล...`;
     }
     
-    const isNewWatch = !watchedLogs[userKey].includes(videoId);
-    
-    if (isOnlineDb) {
-        try {
-            const response = await fetch("/api/watched", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    emptype: currentUser.emptype,
-                    name: currentUser.name,
-                    empId: currentUser.empId,
-                    dept: currentUser.dept,
-                    regTime: currentUser.regTime,
-                    videoId: videoId
-                })
-            });
-            const resData = await response.json();
-            if (response.ok && resData.ok && resData.user) {
-                currentUser = resData.user;
-                localStorage.setItem(DB_CURRENT_USER_KEY, JSON.stringify(currentUser));
-                
-                watchedLogs[userKey] = currentUser.watched || [];
-                localStorage.setItem(DB_WATCHED_KEY, JSON.stringify(watchedLogs));
-                
-                // Sync to local participants state
-                const pIndex = participants.findIndex(p => {
-                    if (currentUser.empId) {
-                        return p.empId && p.empId.toUpperCase() === currentUser.empId.toUpperCase();
-                    } else {
-                        return (!p.empId || p.empId === "") && normalizeName(p.name) === normalizeName(currentUser.name);
-                    }
+    try {
+        if (!watchedLogs[userKey]) {
+            watchedLogs[userKey] = [];
+        }
+        
+        const isNewWatch = !watchedLogs[userKey].includes(videoId);
+        
+        if (isOnlineDb) {
+            try {
+                const response = await fetch("/api/watched", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        emptype: currentUser.emptype,
+                        name: currentUser.name,
+                        empId: currentUser.empId,
+                        dept: currentUser.dept,
+                        division: currentUser.division,
+                        regTime: currentUser.regTime,
+                        videoId: videoId
+                    })
                 });
-                if (pIndex !== -1) {
-                    participants[pIndex].watched = currentUser.watched || [];
-                    participants[pIndex].watchedAt = currentUser.watchedAt || {};
-                    localStorage.setItem(DB_USERS_KEY, JSON.stringify(participants));
-                }
-                
-                if (isNewWatch) {
-                    showToast("บันทึกการรับชมวิดีโอนี้เรียบร้อยแล้ว! (เชื่อมต่อคลาวด์)");
+                const resData = await response.json();
+                if (response.ok && resData.ok && resData.user) {
+                    currentUser = resData.user;
+                    localStorage.setItem(DB_CURRENT_USER_KEY, JSON.stringify(currentUser));
+                    
+                    watchedLogs[userKey] = currentUser.watched || [];
+                    localStorage.setItem(DB_WATCHED_KEY, JSON.stringify(watchedLogs));
+                    
+                    // Sync to local participants state
+                    const pIndex = participants.findIndex(p => {
+                        if (currentUser.empId && currentUser.empId !== "-") {
+                            return p.empId && p.empId.toUpperCase() === currentUser.empId.toUpperCase();
+                        } else {
+                            return (!p.empId || p.empId === "" || p.empId === "-") && normalizeName(p.name) === normalizeName(currentUser.name);
+                        }
+                    });
+                    if (pIndex !== -1) {
+                        participants[pIndex].watched = currentUser.watched || [];
+                        participants[pIndex].watchedAt = currentUser.watchedAt || {};
+                        localStorage.setItem(DB_USERS_KEY, JSON.stringify(participants));
+                    }
+                    
+                    if (isNewWatch) {
+                        showToast("บันทึกการรับชมวิดีโอนี้เรียบร้อยแล้ว! (เชื่อมต่อคลาวด์)");
+                    } else {
+                        showToast("คุณเคยบันทึกการรับชมวิดีโอนี้แล้ว");
+                    }
                 } else {
-                    showToast("คุณเคยบันทึกการรับชมวิดีโอนี้แล้ว");
+                    throw new Error("failed to log");
                 }
-            } else {
-                throw new Error("failed to log");
+            } catch (err) {
+                console.error("Cloud watch log failed, falling back to local:", err);
+                showToast("การบันทึกลงคลาวด์มีปัญหา บันทึกแบบออฟไลน์เรียบร้อยแล้ว", true);
+                localWatchFallback(userKey, videoId, isNewWatch);
             }
-        } catch (err) {
-            console.error("Cloud watch log failed, falling back to local:", err);
-            showToast("การบันทึกลงคลาวด์มีปัญหา บันทึกแบบออฟไลน์เรียบร้อยแล้ว", true);
+        } else {
             localWatchFallback(userKey, videoId, isNewWatch);
         }
-    } else {
-        localWatchFallback(userKey, videoId, isNewWatch);
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = originalBtnHtml;
+        }
+        closeVideoPlayer();
+        renderUserLobby();
+        const adminSec = document.getElementById("admin-section");
+        if (adminSec && !adminSec.classList.contains("hidden") && typeof refreshAdminDashboard === "function") {
+            refreshAdminDashboard();
+        }
     }
-    
-    closeVideoPlayer();
-    renderUserLobby();
 }
 
 // --- Admin Authentication ---
@@ -2800,7 +2923,7 @@ function renderAffiliationVideoStats() {
 
 // Show popup details of watched/unwatched videos for a specific participant
 function showParticipantDetails(userKey) {
-    const user = participants.find(p => (p.empId && (p.empId === userKey || p.empId.toUpperCase() === userKey.toUpperCase())) || (!p.empId && (p.name === userKey || normalizeName(p.name) === normalizeName(userKey))));
+    const user = participants.find(p => (p.empId && p.empId !== "-" && (p.empId === userKey || p.empId.toUpperCase() === userKey.toUpperCase())) || ((!p.empId || p.empId === "-") && (p.name === userKey || normalizeName(p.name) === normalizeName(userKey))));
     if (!user) return;
     
     const userWatched = (user && Array.isArray(user.watched) && user.watched.length > 0) ? user.watched : (watchedLogs[userKey] || []);
@@ -2886,7 +3009,7 @@ async function adminToggleWatch(encodedEmpId, encodedName, encodedEmpType, encod
     const userKey = decodeURIComponent(encodedUserKey);
 
     if (!isOnlineDb) {
-        const p = participants.find(item => (item.empId && item.empId === userKey) || (!item.empId && item.name === userKey));
+        const p = participants.find(item => (item.empId && item.empId !== "-" && (item.empId === userKey || item.empId.toUpperCase() === userKey.toUpperCase())) || ((!item.empId || item.empId === "-") && (item.name === userKey || normalizeName(item.name) === normalizeName(userKey))));
         if (p) {
             if (!p.watched) p.watched = [];
             if (!p.watchedAt) p.watchedAt = {};
@@ -2920,7 +3043,7 @@ async function adminToggleWatch(encodedEmpId, encodedName, encodedEmpType, encod
         });
         const data = await res.json();
         if (res.ok && data.ok && data.user) {
-            const idx = participants.findIndex(p => (p.empId && p.empId.toUpperCase() === empId.toUpperCase()) || (!p.empId && normalizeName(p.name) === normalizeName(name)));
+            const idx = participants.findIndex(p => (empId && empId !== "-" && p.empId && p.empId !== "-" && p.empId.toUpperCase() === empId.toUpperCase()) || ((!empId || empId === "-") && normalizeName(p.name) === normalizeName(name)));
             if (idx !== -1) {
                 participants[idx] = data.user;
             } else {
@@ -3178,37 +3301,52 @@ function exportParticipantsToCSV() {
 // --- Delete Single Participant ---
 async function deleteParticipant(userKey, blobUrl) {
     if (confirm("คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูลผู้เข้าร่วมรายการนี้? การดำเนินการนี้ไม่สามารถย้อนกลับได้")) {
+        const pToDelete = participants.find(p => (p.empId && p.empId !== "-" && (p.empId === userKey || p.empId.toUpperCase() === userKey.toUpperCase())) || ((!p.empId || p.empId === "-") && (p.name === userKey || normalizeName(p.name) === normalizeName(userKey))));
+
         if (isOnlineDb) {
-            if (blobUrl) {
-                try {
-                    const response = await fetch("/api/delete-participant", {
-                        method: "DELETE",
-                        headers: {
-                            "Content-Type": "application/json",
-                            "x-admin-password": encodeURIComponent(adminPassword)
-                        },
-                        body: JSON.stringify({ url: blobUrl })
-                    });
-                    const resData = await response.json();
-                    if (!response.ok || !resData.ok) {
-                        throw new Error(resData.error || "failed to delete");
-                    }
-                } catch (err) {
-                    console.error("Cloud delete failed:", err);
-                    showToast("ไม่สามารถลบข้อมูลบนระบบคลาวด์ได้เนื่องจากการเชื่อมต่อขัดข้อง", true);
-                    return;
+            try {
+                const response = await fetch("/api/delete-participant", {
+                    method: "DELETE",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "x-admin-password": encodeURIComponent(adminPassword)
+                    },
+                    body: JSON.stringify({ 
+                        url: blobUrl || (pToDelete ? pToDelete._blobUrl : null),
+                        empId: pToDelete ? pToDelete.empId : (userKey !== pToDelete?.name ? userKey : ""),
+                        name: pToDelete ? pToDelete.name : userKey
+                    })
+                });
+                const resData = await response.json();
+                if (!response.ok || !resData.ok) {
+                    throw new Error(resData.error || "failed to delete");
                 }
+            } catch (err) {
+                console.error("Cloud delete failed:", err);
+                showToast("ไม่สามารถลบข้อมูลบนระบบคลาวด์ได้เนื่องจากการเชื่อมต่อขัดข้อง", true);
+                return;
             }
         }
         
         // Remove locally
-        participants = participants.filter(p => (p.empId || p.name) !== userKey);
+        participants = participants.filter(p => {
+            if (pToDelete) {
+                if (pToDelete.empId && pToDelete.empId !== "-") {
+                    return p.empId?.toUpperCase() !== pToDelete.empId.toUpperCase();
+                } else {
+                    return normalizeName(p.name) !== normalizeName(pToDelete.name);
+                }
+            }
+            return (p.empId || p.name) !== userKey;
+        });
         delete watchedLogs[userKey];
+        if (pToDelete && pToDelete.empId) delete watchedLogs[pToDelete.empId];
+        if (pToDelete && pToDelete.name) delete watchedLogs[pToDelete.name];
         
         localStorage.setItem(DB_USERS_KEY, JSON.stringify(participants));
         localStorage.setItem(DB_WATCHED_KEY, JSON.stringify(watchedLogs));
         
-        if (currentUser && (currentUser.empId || currentUser.name) === userKey) {
+        if (currentUser && ((currentUser.empId && pToDelete?.empId && currentUser.empId.toUpperCase() === pToDelete.empId.toUpperCase()) || (currentUser.name && pToDelete?.name && normalizeName(currentUser.name) === normalizeName(pToDelete.name)) || (currentUser.empId || currentUser.name) === userKey)) {
             localStorage.removeItem(DB_CURRENT_USER_KEY);
             currentUser = null;
         }
@@ -3220,7 +3358,7 @@ async function deleteParticipant(userKey, blobUrl) {
 
 // --- Edit Participant Modal Controls ---
 function openParticipantEditModal(userKey) {
-    const user = participants.find(p => (p.empId || p.name) === userKey);
+    const user = participants.find(p => (p.empId && p.empId !== "-" && (p.empId === userKey || p.empId.toUpperCase() === userKey.toUpperCase())) || ((!p.empId || p.empId === "-") && (p.name === userKey || normalizeName(p.name) === normalizeName(userKey))));
     if (!user) return;
     
     document.getElementById("edit-p-key").value = userKey;
@@ -3350,7 +3488,7 @@ async function handleParticipantEditSave(e) {
     e.preventDefault();
     
     const oldUserKey = document.getElementById("edit-p-key").value;
-    const originalUser = participants.find(p => (p.empId || p.name) === oldUserKey);
+    const originalUser = participants.find(p => (p.empId && p.empId !== "-" && (p.empId === oldUserKey || p.empId.toUpperCase() === oldUserKey.toUpperCase())) || ((!p.empId || p.empId === "-") && (p.name === oldUserKey || normalizeName(p.name) === normalizeName(oldUserKey))));
     if (!originalUser) return;
     
     const emptype = document.querySelector('input[name="edit-emptype"]:checked').value;
@@ -3391,7 +3529,7 @@ async function handleParticipantEditSave(e) {
         watchedAt: originalUser.watchedAt || {}
     };
     
-    const newUserKey = empId || name;
+    const newUserKey = (empId && empId !== "-") ? empId : name;
     const keyChanged = oldUserKey !== newUserKey;
     
     const submitBtn = document.querySelector("#participant-edit-form button[type='submit']");
@@ -3402,14 +3540,18 @@ async function handleParticipantEditSave(e) {
     
     if (isOnlineDb) {
         try {
-            if (keyChanged && originalUser._blobUrl) {
+            if (keyChanged && originalUser) {
                 await fetch("/api/delete-participant", {
                     method: "DELETE",
                     headers: {
                         "Content-Type": "application/json",
                         "x-admin-password": encodeURIComponent(adminPassword)
                     },
-                    body: JSON.stringify({ url: originalUser._blobUrl })
+                    body: JSON.stringify({ 
+                        url: originalUser._blobUrl,
+                        empId: originalUser.empId,
+                        name: originalUser.name
+                    })
                 }).catch(err => console.error("Clean old record failed:", err));
             }
             
@@ -3422,7 +3564,7 @@ async function handleParticipantEditSave(e) {
             if (response.ok && resData.ok && resData.user) {
                 const serverUser = resData.user;
                 
-                const index = participants.findIndex(p => (p.empId || p.name) === oldUserKey);
+                const index = participants.findIndex(p => (p.empId && p.empId !== "-" && (p.empId === oldUserKey || p.empId.toUpperCase() === oldUserKey.toUpperCase())) || ((!p.empId || p.empId === "-") && (p.name === oldUserKey || normalizeName(p.name) === normalizeName(oldUserKey))));
                 if (index !== -1) {
                     participants[index] = serverUser;
                 }
@@ -3435,7 +3577,7 @@ async function handleParticipantEditSave(e) {
                 localStorage.setItem(DB_USERS_KEY, JSON.stringify(participants));
                 localStorage.setItem(DB_WATCHED_KEY, JSON.stringify(watchedLogs));
                 
-                if (currentUser && (currentUser.empId || currentUser.name) === oldUserKey) {
+                if (currentUser && ((currentUser.empId && currentUser.empId !== "-" && currentUser.empId.toUpperCase() === oldUserKey.toUpperCase()) || normalizeName(currentUser.name) === normalizeName(oldUserKey) || (currentUser.empId || currentUser.name) === oldUserKey)) {
                     currentUser = serverUser;
                     localStorage.setItem(DB_CURRENT_USER_KEY, JSON.stringify(currentUser));
                 }
@@ -3466,7 +3608,7 @@ async function handleParticipantEditSave(e) {
 }
 
 function localEditFallback(oldUserKey, newUserKey, keyChanged, updatedUser) {
-    const index = participants.findIndex(p => (p.empId || p.name) === oldUserKey);
+    const index = participants.findIndex(p => (p.empId && p.empId !== "-" && (p.empId === oldUserKey || p.empId.toUpperCase() === oldUserKey.toUpperCase())) || ((!p.empId || p.empId === "-") && (p.name === oldUserKey || normalizeName(p.name) === normalizeName(oldUserKey))));
     if (index !== -1) {
         participants[index] = updatedUser;
     }
@@ -3479,7 +3621,7 @@ function localEditFallback(oldUserKey, newUserKey, keyChanged, updatedUser) {
     localStorage.setItem(DB_USERS_KEY, JSON.stringify(participants));
     localStorage.setItem(DB_WATCHED_KEY, JSON.stringify(watchedLogs));
     
-    if (currentUser && (currentUser.empId || currentUser.name) === oldUserKey) {
+    if (currentUser && ((currentUser.empId && currentUser.empId !== "-" && currentUser.empId.toUpperCase() === oldUserKey.toUpperCase()) || normalizeName(currentUser.name) === normalizeName(oldUserKey) || (currentUser.empId || currentUser.name) === oldUserKey)) {
         currentUser = updatedUser;
         localStorage.setItem(DB_CURRENT_USER_KEY, JSON.stringify(currentUser));
     }

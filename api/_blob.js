@@ -25,12 +25,19 @@ export const normalizeName = name => {
     .replace(/\s+/g, "");
 };
 
-const safeStr = s => (s || "").replace(/\s+/g, "_").replace(/[^\w฀-๿]/g, "").slice(0, 40);
+export const isMockUser = u => {
+  if (!u) return false;
+  const name = String(u.name || "").trim();
+  const empId = String(u.empId || "").trim().toUpperCase();
+  return empId === "EMP001" || name.includes("สมชาย รักษ์พลังงาน") || name.includes("สมหญิง ประหยัดดี");
+};
+
+const safeStr = s => (s || "").replace(/\s+/g, "_").replace(/[^\w\u0e00-\u0e7f]/g, "").slice(0, 40);
 
 export function getBlobKey(user) {
   const empId = user && user.empId && user.empId !== "-" ? String(user.empId).trim().toUpperCase() : "";
   if (empId) {
-    return `emp-${empId.replace(/[^a-zA-Z0-9]/g, "_")}`;
+    return `emp-${empId.replace(/[^\w\u0e00-\u0e7f]/g, "_")}`;
   } else {
     return `contractor-${safeStr(normalizeName(user ? user.name : ""))}`;
   }
@@ -40,6 +47,11 @@ export async function findParticipant({ emptype, name, empId }) {
   checkToken();
   const cleanEmpId = empId && empId !== "-" ? String(empId).trim().toUpperCase() : "";
   const cleanName = normalizeName(name);
+
+  // Prevent finding mock users
+  if (cleanEmpId === "EMP001" || (cleanName && (cleanName.includes("สมชาย") || cleanName.includes("สมหญิง")))) {
+    return null;
+  }
 
   // 1. Try direct lookup by key if empId is given
   if (cleanEmpId) {
@@ -108,7 +120,13 @@ export async function readAllParticipants() {
     }
   }));
   
-  const validRows = rows.filter(r => r !== null && r.name);
+  // Purge any legacy mock user demo blobs
+  const mockBlobsToDelete = rows.filter(r => r !== null && isMockUser(r) && r._blobUrl).map(r => r._blobUrl);
+  if (mockBlobsToDelete.length > 0) {
+    del(mockBlobsToDelete).catch(err => console.warn("Failed to delete mock blobs:", err));
+  }
+
+  const validRows = rows.filter(r => r !== null && r.name && !isMockUser(r));
 
   // Deduplicate and merge participants by unique identity
   const map = new Map();
