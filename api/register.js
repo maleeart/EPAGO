@@ -1,6 +1,7 @@
 import { findParticipant, saveParticipant } from "./_blob.js";
 
 export default async function handler(req, res) {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
   if (req.method === "GET") {
     const { empId, name, emptype } = req.query ?? {};
     const cleanEmpId = (empId && empId !== "-") ? String(empId).trim().toUpperCase() : "";

@@ -1,9 +1,10 @@
 import { findParticipant, saveParticipant } from "./_blob.js";
 
 export default async function handler(req, res) {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
   if (req.method !== "POST") return res.status(405).json({ error: "method not allowed" });
 
-  const { emptype, name, empId, videoId, dept, division, regTime } = req.body ?? {};
+  const { emptype, name, empId, videoId, dept, division, regTime, watched, watchedAt } = req.body ?? {};
 
   if (!emptype || !name || !videoId) {
     return res.status(400).json({ error: "ข้อมูลสำหรับบันทึกการรับชมไม่ครบถ้วน" });
@@ -21,50 +22,37 @@ export default async function handler(req, res) {
     const localTime = new Date(now.getTime() + tzOffset * 60000);
     const formattedDate = `${localTime.getUTCFullYear()}-${String(localTime.getUTCMonth() + 1).padStart(2, '0')}-${String(localTime.getUTCDate()).padStart(2, '0')} ${String(localTime.getUTCHours()).padStart(2, '0')}:${String(localTime.getUTCMinutes()).padStart(2, '0')}`;
 
-    if (!user) {
-      // Auto-recover/auto-create missing participant record on cloud so no watch history is ever lost
-      user = {
-        emptype: emptype || "พนักงาน",
-        empId: cleanEmpId,
-        name: cleanName,
-        dept: (dept || "อื่นๆ").trim(),
-        division: (division || "").trim(),
-        regTime: regTime || formattedDate,
-        watched: [cleanVideoId],
-        watchedAt: { [cleanVideoId]: formattedDate }
-      };
-      const result = await saveParticipant(user);
-      return res.status(200).json({ ok: true, user: { ...user, _blobUrl: result.url } });
-    }
+    // Combine any watched list sent from the client with the server's record
+    const incomingWatched = Array.isArray(watched) ? watched.map(v => String(v).trim()).filter(Boolean) : [];
+    const incomingWatchedAt = (watchedAt && typeof watchedAt === "object") ? watchedAt : {};
 
-    if (!Array.isArray(user.watched)) {
-      user.watched = [];
-    }
+    const existingWatched = (user && Array.isArray(user.watched)) ? user.watched : [];
+    const existingWatchedAt = (user && user.watchedAt && typeof user.watchedAt === "object") ? user.watchedAt : {};
 
-    if (!user.watched.includes(cleanVideoId)) {
-      user.watched.push(cleanVideoId);
-    }
+    const mergedWatched = Array.from(new Set([
+      ...existingWatched,
+      ...incomingWatched,
+      cleanVideoId
+    ])).filter(Boolean);
 
-    if (!user.watchedAt || typeof user.watchedAt !== "object") {
-      user.watchedAt = {};
-    }
+    const mergedWatchedAt = {
+      ...existingWatchedAt,
+      ...incomingWatchedAt,
+      [cleanVideoId]: formattedDate
+    };
 
-    if (!user.watchedAt[cleanVideoId]) {
-      user.watchedAt[cleanVideoId] = formattedDate;
-    }
-
-    // Also update empId if was missing
-    if (cleanEmpId && (!user.empId || user.empId === "" || user.empId === "-")) {
-      user.empId = cleanEmpId;
-    }
-
-    // Also update dept if provided and missing
-    if (dept && (!user.dept || user.dept === "" || user.dept === "อื่นๆ")) {
-      user.dept = dept.trim();
-    }
-    if (division && (!user.division || user.division === "")) {
-      user.division = division.trim();
-    }
+    user = {
+      ...(user || {}),
+      emptype: emptype || user?.emptype || "พนักงาน",
+      empId: cleanEmpId || user?.empId || "",
+      name: cleanName || user?.name || "",
+      dept: (dept || user?.dept || "อื่นๆ").trim(),
+      division: (division !== undefined && division !== null ? String(division).trim() : (user?.division || "")),
+      regTime: user?.regTime || regTime || formattedDate,
+      watched: mergedWatched,
+      watchedAt: mergedWatchedAt,
+      _blobUrl: user?._blobUrl
+    };
 
     const result = await saveParticipant(user);
     res.status(200).json({ ok: true, user: { ...user, _blobUrl: result.url } });

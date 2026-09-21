@@ -8,7 +8,10 @@ export async function readParticipant(key) {
     const { blobs } = await list({ prefix: `${PREFIX}${key}.json` });
     const b = blobs && blobs.find(item => item.pathname === `${PREFIX}${key}.json`) || (blobs && blobs[0]);
     if (b) {
-      const data = await fetch(`${b.url}?t=${Date.now()}`).then(r => r.json());
+      const data = await fetch(`${b.url}?t=${Date.now()}`, {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache" }
+      }).then(r => r.json());
       return { ...data, _blobUrl: b.url };
     }
   } catch (e) {
@@ -53,18 +56,25 @@ export async function findParticipant({ emptype, name, empId }) {
     return null;
   }
 
-  // 1. Try direct lookup by key if empId is given
-  if (cleanEmpId) {
-    const user = await readParticipant(`emp-${cleanEmpId.replace(/[^a-zA-Z0-9]/g, "_")}`);
+  // 1. Try canonical key lookup
+  const canonicalKey = getBlobKey({ empId: cleanEmpId, name: cleanName });
+  if (canonicalKey) {
+    const user = await readParticipant(canonicalKey);
     if (user) return user;
   }
-  // 2. Try contractor key if name is given
+
+  // 2. Try direct lookup by empId if given
+  if (cleanEmpId) {
+    const user = await readParticipant(`emp-${cleanEmpId.replace(/[^\w\u0e00-\u0e7f]/g, "_")}`);
+    if (user) return user;
+  }
+  // 3. Try contractor key if name is given
   if (cleanName) {
     const user = await readParticipant(`contractor-${safeStr(cleanName)}`);
     if (user) return user;
   }
 
-  // 3. Fallback: scan all participants to guarantee matching
+  // 4. Fallback: scan all participants to guarantee matching
   try {
     const all = await readAllParticipants();
     return all.find(p => {
@@ -93,6 +103,7 @@ export async function saveParticipant(data) {
     access: "public",
     addRandomSuffix: false,
     allowOverwrite: true,
+    cacheControlMaxAge: 0,
   });
 
   // If data migrated from a legacy/different blob URL, delete the old file to prevent duplicates
@@ -112,7 +123,10 @@ export async function readAllParticipants() {
   
   const rows = await Promise.all(blobs.map(async b => {
     try {
-      const data = await fetch(`${b.url}?t=${Date.now()}`).then(r => r.json());
+      const data = await fetch(`${b.url}?t=${Date.now()}`, {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache" }
+      }).then(r => r.json());
       return { ...data, _blobUrl: b.url };
     } catch (e) {
       console.error(`Failed to fetch blob at ${b.url}:`, e);

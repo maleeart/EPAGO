@@ -15,6 +15,12 @@ const normalizeName = name => {
         .replace(/\s+/g, "");
 };
 
+// Centralized helper to get unique user key (ignores "-" empId for contractors)
+function getUserKey(user) {
+    if (!user) return "";
+    return (user.empId && user.empId !== "-") ? String(user.empId).trim().toUpperCase() : String(user.name || "").trim();
+}
+
 function getCurrentTimestamp() {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
@@ -470,7 +476,7 @@ async function syncCurrentUserWatchedProgress() {
         const resData = await response.json().catch(() => ({}));
         if (response.ok && resData.ok && resData.user) {
             const cloudUser = resData.user;
-            const userKey = (currentUser.empId && currentUser.empId !== "-") ? currentUser.empId : currentUser.name;
+            const userKey = getUserKey(currentUser);
             const localWatched = Array.isArray(currentUser.watched) ? currentUser.watched : (watchedLogs[userKey] || []);
             const cloudWatched = Array.isArray(cloudUser.watched) ? cloudUser.watched : [];
 
@@ -488,7 +494,9 @@ async function syncCurrentUserWatchedProgress() {
                             dept: currentUser.dept,
                             division: currentUser.division,
                             regTime: currentUser.regTime,
-                            videoId: vId
+                            videoId: vId,
+                            watched: localWatched,
+                            watchedAt: currentUser.watchedAt || {}
                         })
                     }).catch(e => console.warn("Failed to push missing watch to cloud:", e));
                 }
@@ -508,7 +516,7 @@ async function syncCurrentUserWatchedProgress() {
             renderUserLobby();
         } else if (response.status === 404 && isOnlineDb) {
             // Auto-heal: If user exists locally but was lost/unrecorded on cloud, sync to cloud now
-            const userKey = currentUser.empId || currentUser.name;
+            const userKey = getUserKey(currentUser);
             const watched = currentUser.watched || watchedLogs[userKey] || [];
             const regRes = await fetch("/api/register", {
                 method: "POST",
@@ -518,8 +526,10 @@ async function syncCurrentUserWatchedProgress() {
                     empId: currentUser.empId || "",
                     name: currentUser.name,
                     dept: currentUser.dept,
+                    division: currentUser.division,
                     regTime: currentUser.regTime,
-                    watched: watched
+                    watched: watched,
+                    watchedAt: currentUser.watchedAt || {}
                 })
             }).catch(e => null);
             if (regRes && regRes.ok) {
@@ -584,8 +594,8 @@ async function migrateLocalDataToCloud() {
         console.log("EPAGO: Migrating " + realParts.length + " local participants to cloud database...");
         
         for (const part of realParts) {
-            const userKey = part.empId || part.name;
-            const watched = localWatched[userKey] || [];
+            const userKey = getUserKey(part);
+            const watched = localWatched[userKey] || part.watched || [];
             
             await fetch("/api/register", {
                 method: "POST",
@@ -779,9 +789,9 @@ function localRegistrationFallback(newParticipant, existingIndex) {
     }
     localStorage.setItem(DB_USERS_KEY, JSON.stringify(participants));
     
-    const userKey = newParticipant.empId || newParticipant.name;
+    const userKey = getUserKey(newParticipant);
     if (!watchedLogs[userKey]) {
-        watchedLogs[userKey] = [];
+        watchedLogs[userKey] = Array.isArray(newParticipant.watched) ? newParticipant.watched : [];
         localStorage.setItem(DB_WATCHED_KEY, JSON.stringify(watchedLogs));
     }
     
@@ -895,7 +905,7 @@ async function handleRegistration(e) {
                 participants = Array.from(seenMap.values());
                 localStorage.setItem(DB_USERS_KEY, JSON.stringify(participants));
                 
-                const userKey = (empId && empId !== "-") ? empId : name;
+                const userKey = getUserKey(serverUser);
                 watchedLogs[userKey] = serverUser.watched || [];
                 localStorage.setItem(DB_WATCHED_KEY, JSON.stringify(watchedLogs));
                 
@@ -1061,8 +1071,8 @@ async function handleReturningLogin(e) {
             const resData = await response.json();
             if (response.ok && resData.ok && resData.user) {
                 const cloudUser = resData.user;
-                const userKey = cloudUser.empId || cloudUser.name;
-                const localWatched = (currentUser && (currentUser.empId === cloudUser.empId || currentUser.name === cloudUser.name) && Array.isArray(currentUser.watched))
+                const userKey = getUserKey(cloudUser);
+                const localWatched = (currentUser && (currentUser.empId === cloudUser.empId || normalizeName(currentUser.name) === normalizeName(cloudUser.name)) && Array.isArray(currentUser.watched))
                     ? currentUser.watched 
                     : (watchedLogs[userKey] || []);
                 const cloudWatched = Array.isArray(cloudUser.watched) ? cloudUser.watched : [];
@@ -1079,8 +1089,11 @@ async function handleReturningLogin(e) {
                                 name: cloudUser.name,
                                 empId: cloudUser.empId,
                                 dept: cloudUser.dept,
+                                division: cloudUser.division,
                                 regTime: cloudUser.regTime,
-                                videoId: vId
+                                videoId: vId,
+                                watched: localWatched,
+                                watchedAt: currentUser?.watchedAt || {}
                             })
                         }).catch(e => console.warn("Failed to push missing watch on login:", e));
                     }
@@ -1163,8 +1176,10 @@ async function handleReturningLogin(e) {
 function renderUserLobby() {
     if (!currentUser) return;
     
-    const userKey = currentUser.empId || currentUser.name;
-    const userWatched = watchedLogs[userKey] || [];
+    const userKey = getUserKey(currentUser);
+    const userWatched = (currentUser && Array.isArray(currentUser.watched) && currentUser.watched.length > 0)
+        ? currentUser.watched
+        : (watchedLogs[userKey] || []);
     const totalVideos = videos.length;
     const watchedCount = userWatched.filter(id => videos.some(v => v.id === id)).length;
     
@@ -1518,44 +1533,42 @@ function closeVideoPlayer() {
 }
 
 function localWatchFallback(userKey, videoId, isNewWatch) {
-    if (isNewWatch) {
-        if (!watchedLogs[userKey]) watchedLogs[userKey] = [];
-        if (!watchedLogs[userKey].includes(videoId)) {
-            watchedLogs[userKey].push(videoId);
+    const key = userKey || getUserKey(currentUser);
+    if (!watchedLogs[key]) watchedLogs[key] = [];
+    if (!watchedLogs[key].includes(videoId)) {
+        watchedLogs[key].push(videoId);
+    }
+    localStorage.setItem(DB_WATCHED_KEY, JSON.stringify(watchedLogs));
+    
+    const watchTime = getCurrentTimestamp();
+    
+    // Sync to local participants state
+    if (currentUser) {
+        if (!Array.isArray(currentUser.watched)) currentUser.watched = [];
+        if (!currentUser.watched.includes(videoId)) {
+            currentUser.watched.push(videoId);
         }
-        localStorage.setItem(DB_WATCHED_KEY, JSON.stringify(watchedLogs));
-        
-        const watchTime = getCurrentTimestamp();
-        
-        // Sync to local participants state
-        if (currentUser) {
-            const pIndex = participants.findIndex(p => {
-                if (currentUser.empId && currentUser.empId !== "-") {
-                    return p.empId && p.empId.toUpperCase() === currentUser.empId.toUpperCase();
-                } else {
-                    return (!p.empId || p.empId === "" || p.empId === "-") && normalizeName(p.name) === normalizeName(currentUser.name);
-                }
-            });
-            if (pIndex !== -1) {
-                if (!participants[pIndex].watched) participants[pIndex].watched = [];
-                if (!participants[pIndex].watched.includes(videoId)) {
-                    participants[pIndex].watched.push(videoId);
-                }
-                if (!participants[pIndex].watchedAt) participants[pIndex].watchedAt = {};
-                participants[pIndex].watchedAt[videoId] = watchTime;
-                localStorage.setItem(DB_USERS_KEY, JSON.stringify(participants));
-            }
-            
-            // Also update currentUser object representation
-            if (!currentUser.watched) currentUser.watched = [];
-            if (!currentUser.watched.includes(videoId)) {
-                currentUser.watched.push(videoId);
-            }
-            if (!currentUser.watchedAt) currentUser.watchedAt = {};
+        if (!currentUser.watchedAt || typeof currentUser.watchedAt !== "object") currentUser.watchedAt = {};
+        if (!currentUser.watchedAt[videoId]) {
             currentUser.watchedAt[videoId] = watchTime;
-            localStorage.setItem(DB_CURRENT_USER_KEY, JSON.stringify(currentUser));
         }
-        
+        localStorage.setItem(DB_CURRENT_USER_KEY, JSON.stringify(currentUser));
+
+        const pIndex = participants.findIndex(p => {
+            if (currentUser.empId && currentUser.empId !== "-") {
+                return p.empId && p.empId.toUpperCase() === currentUser.empId.toUpperCase();
+            } else {
+                return (!p.empId || p.empId === "" || p.empId === "-") && normalizeName(p.name) === normalizeName(currentUser.name);
+            }
+        });
+        if (pIndex !== -1) {
+            participants[pIndex].watched = Array.from(new Set([...(participants[pIndex].watched || []), ...currentUser.watched]));
+            participants[pIndex].watchedAt = { ...(participants[pIndex].watchedAt || {}), ...(currentUser.watchedAt || {}) };
+            localStorage.setItem(DB_USERS_KEY, JSON.stringify(participants));
+        }
+    }
+    
+    if (isNewWatch) {
         showToast("บันทึกการรับชมวิดีโอนี้เรียบร้อยแล้ว!");
     } else {
         showToast("คุณเคยบันทึกการรับชมวิดีโอนี้แล้ว");
@@ -1566,7 +1579,7 @@ function localWatchFallback(userKey, videoId, isNewWatch) {
 async function markCurrentVideoWatched() {
     if (!currentUser || !currentPlayingVideo) return;
     
-    const userKey = (currentUser.empId && currentUser.empId !== "-") ? currentUser.empId : currentUser.name;
+    const userKey = getUserKey(currentUser);
     const videoId = currentPlayingVideo.id;
     const btn = document.getElementById("mark-watched-btn");
     const originalBtnHtml = btn ? btn.innerHTML : "";
@@ -1580,9 +1593,40 @@ async function markCurrentVideoWatched() {
         if (!watchedLogs[userKey]) {
             watchedLogs[userKey] = [];
         }
-        
         const isNewWatch = !watchedLogs[userKey].includes(videoId);
+        const watchTime = getCurrentTimestamp();
+
+        // 1. Instantly update local state to preserve previously watched videos
+        if (!watchedLogs[userKey].includes(videoId)) {
+            watchedLogs[userKey].push(videoId);
+        }
+        if (!Array.isArray(currentUser.watched)) currentUser.watched = [];
+        if (!currentUser.watched.includes(videoId)) {
+            currentUser.watched.push(videoId);
+        }
+        if (!currentUser.watchedAt || typeof currentUser.watchedAt !== "object") currentUser.watchedAt = {};
+        if (!currentUser.watchedAt[videoId]) {
+            currentUser.watchedAt[videoId] = watchTime;
+        }
         
+        localStorage.setItem(DB_CURRENT_USER_KEY, JSON.stringify(currentUser));
+        localStorage.setItem(DB_WATCHED_KEY, JSON.stringify(watchedLogs));
+
+        // Sync local participants
+        const pIndex = participants.findIndex(p => {
+            if (currentUser.empId && currentUser.empId !== "-") {
+                return p.empId && p.empId.toUpperCase() === currentUser.empId.toUpperCase();
+            } else {
+                return (!p.empId || p.empId === "" || p.empId === "-") && normalizeName(p.name) === normalizeName(currentUser.name);
+            }
+        });
+        if (pIndex !== -1) {
+            participants[pIndex].watched = Array.from(new Set([...(participants[pIndex].watched || []), ...currentUser.watched]));
+            participants[pIndex].watchedAt = { ...(participants[pIndex].watchedAt || {}), ...(currentUser.watchedAt || {}) };
+            localStorage.setItem(DB_USERS_KEY, JSON.stringify(participants));
+        }
+
+        // 2. Sync to cloud database with both local watched array and videoId
         if (isOnlineDb) {
             try {
                 const response = await fetch("/api/watched", {
@@ -1595,28 +1639,37 @@ async function markCurrentVideoWatched() {
                         dept: currentUser.dept,
                         division: currentUser.division,
                         regTime: currentUser.regTime,
-                        videoId: videoId
+                        videoId: videoId,
+                        watched: currentUser.watched,
+                        watchedAt: currentUser.watchedAt
                     })
                 });
                 const resData = await response.json();
                 if (response.ok && resData.ok && resData.user) {
-                    currentUser = resData.user;
+                    // Safe merge of server and local watched
+                    const serverWatched = Array.isArray(resData.user.watched) ? resData.user.watched : [];
+                    const localWatched = Array.isArray(currentUser.watched) ? currentUser.watched : [];
+                    const combinedWatched = Array.from(new Set([...localWatched, ...serverWatched, videoId]));
+                    
+                    const combinedWatchedAt = {
+                        ...(currentUser.watchedAt || {}),
+                        ...(resData.user.watchedAt || {}),
+                        [videoId]: resData.user.watchedAt?.[videoId] || currentUser.watchedAt?.[videoId] || watchTime
+                    };
+
+                    currentUser = {
+                        ...resData.user,
+                        watched: combinedWatched,
+                        watchedAt: combinedWatchedAt
+                    };
                     localStorage.setItem(DB_CURRENT_USER_KEY, JSON.stringify(currentUser));
                     
-                    watchedLogs[userKey] = currentUser.watched || [];
+                    watchedLogs[userKey] = combinedWatched;
                     localStorage.setItem(DB_WATCHED_KEY, JSON.stringify(watchedLogs));
                     
-                    // Sync to local participants state
-                    const pIndex = participants.findIndex(p => {
-                        if (currentUser.empId && currentUser.empId !== "-") {
-                            return p.empId && p.empId.toUpperCase() === currentUser.empId.toUpperCase();
-                        } else {
-                            return (!p.empId || p.empId === "" || p.empId === "-") && normalizeName(p.name) === normalizeName(currentUser.name);
-                        }
-                    });
                     if (pIndex !== -1) {
-                        participants[pIndex].watched = currentUser.watched || [];
-                        participants[pIndex].watchedAt = currentUser.watchedAt || {};
+                        participants[pIndex].watched = combinedWatched;
+                        participants[pIndex].watchedAt = combinedWatchedAt;
                         localStorage.setItem(DB_USERS_KEY, JSON.stringify(participants));
                     }
                     
@@ -1629,12 +1682,15 @@ async function markCurrentVideoWatched() {
                     throw new Error("failed to log");
                 }
             } catch (err) {
-                console.error("Cloud watch log failed, falling back to local:", err);
+                console.error("Cloud watch log failed, already recorded locally:", err);
                 showToast("การบันทึกลงคลาวด์มีปัญหา บันทึกแบบออฟไลน์เรียบร้อยแล้ว", true);
-                localWatchFallback(userKey, videoId, isNewWatch);
             }
         } else {
-            localWatchFallback(userKey, videoId, isNewWatch);
+            if (isNewWatch) {
+                showToast("บันทึกการรับชมวิดีโอนี้เรียบร้อยแล้ว!");
+            } else {
+                showToast("คุณเคยบันทึกการรับชมวิดีโอนี้แล้ว");
+            }
         }
     } finally {
         if (btn) {
@@ -1687,7 +1743,7 @@ function logoutAdmin() {
 async function fetchOnlineParticipants() {
     if (!isOnlineDb) return;
     try {
-        const response = await fetch("/api/participants", {
+        const response = await fetch(`/api/participants?t=${Date.now()}`, {
             method: "GET",
             headers: {
                 "x-admin-password": encodeURIComponent(adminPassword)
@@ -1715,7 +1771,7 @@ async function fetchOnlineParticipants() {
             // Recompile local watchedLogs mapping
             watchedLogs = {};
             participants.forEach(p => {
-                const userKey = (p.empId && p.empId !== "-") ? p.empId : p.name;
+                const userKey = getUserKey(p);
                 watchedLogs[userKey] = p.watched || [];
             });
             
@@ -3241,8 +3297,8 @@ function exportParticipantsToCSV() {
     let csvContent = headers.map(h => `"${h.replace(/"/g, '""')}"`).join(",") + "\n";
     
     participants.forEach(user => {
-        const userKey = user.empId || user.name;
-        const userWatched = watchedLogs[userKey] || [];
+        const userKey = getUserKey(user);
+        const userWatched = (user && Array.isArray(user.watched) && user.watched.length > 0) ? user.watched : (watchedLogs[userKey] || []);
         const totalCount = videos.length;
         const watchedCount = userWatched.filter(id => videos.some(v => v.id === id)).length;
         const statusText = (watchedCount === totalCount && totalCount > 0) ? "รับชมครบถ้วน" : "กำลังรับชม";
@@ -3337,7 +3393,7 @@ async function deleteParticipant(userKey, blobUrl) {
                     return normalizeName(p.name) !== normalizeName(pToDelete.name);
                 }
             }
-            return (p.empId || p.name) !== userKey;
+            return getUserKey(p) !== userKey;
         });
         delete watchedLogs[userKey];
         if (pToDelete && pToDelete.empId) delete watchedLogs[pToDelete.empId];
@@ -3346,7 +3402,7 @@ async function deleteParticipant(userKey, blobUrl) {
         localStorage.setItem(DB_USERS_KEY, JSON.stringify(participants));
         localStorage.setItem(DB_WATCHED_KEY, JSON.stringify(watchedLogs));
         
-        if (currentUser && ((currentUser.empId && pToDelete?.empId && currentUser.empId.toUpperCase() === pToDelete.empId.toUpperCase()) || (currentUser.name && pToDelete?.name && normalizeName(currentUser.name) === normalizeName(pToDelete.name)) || (currentUser.empId || currentUser.name) === userKey)) {
+        if (currentUser && ((currentUser.empId && pToDelete?.empId && currentUser.empId.toUpperCase() === pToDelete.empId.toUpperCase()) || (currentUser.name && pToDelete?.name && normalizeName(currentUser.name) === normalizeName(pToDelete.name)) || getUserKey(currentUser) === userKey)) {
             localStorage.removeItem(DB_CURRENT_USER_KEY);
             currentUser = null;
         }
@@ -3692,7 +3748,7 @@ function showLoginSuggestions(inputName, selectedEmptype) {
                     currentUser = u;
                     localStorage.setItem(DB_CURRENT_USER_KEY, JSON.stringify(currentUser));
                     
-                    const userKey = currentUser.empId || currentUser.name;
+                    const userKey = getUserKey(currentUser);
                     watchedLogs[userKey] = currentUser.watched || [];
                     localStorage.setItem(DB_WATCHED_KEY, JSON.stringify(watchedLogs));
                     

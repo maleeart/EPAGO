@@ -2,6 +2,7 @@ import { readAllParticipants } from "./_blob.js";
 import { authed } from "./_auth.js";
 
 export default async function handler(req, res) {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
   if (!authed(req, res)) return;
   if (req.method !== "GET") return res.status(405).json({ error: "method not allowed" });
 
