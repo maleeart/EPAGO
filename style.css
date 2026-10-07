@@ -158,6 +158,24 @@ body {
     transform: translateY(-1px);
 }
 
+.btn-pdf {
+    background: linear-gradient(135deg, #e11d48 0%, #be123c 100%);
+    color: #ffffff;
+    border: none;
+    box-shadow: 0 4px 12px rgba(225, 29, 72, 0.25);
+}
+
+.btn-pdf:hover {
+    background: linear-gradient(135deg, #be123c 0%, #9f1239 100%);
+    color: #ffffff;
+    box-shadow: 0 6px 16px rgba(225, 29, 72, 0.35);
+    transform: translateY(-1px);
+}
+
+.btn-pdf:active {
+    transform: translateY(0);
+}
+
 .btn-outline {
     background-color: transparent;
     border: 1.5px solid var(--border-color);

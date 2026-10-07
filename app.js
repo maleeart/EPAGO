@@ -3437,11 +3437,13 @@ async function clearAllParticipants() {
     }
 }
 
-// --- Export Summary Report by Department & Division (Excel / CSV) ---
+// --- Export Summary Report by Department & Division (Excel / CSV / PDF) ---
 function exportSummaryReport(format = 'excel') {
     const summaryData = getAffiliationSummaryData();
     if (format === 'csv') {
         exportSummaryToCSV(summaryData);
+    } else if (format === 'pdf') {
+        exportSummaryToPDF(summaryData);
     } else {
         exportSummaryToExcel(summaryData);
     }
@@ -3672,6 +3674,336 @@ function exportSummaryToCSV(data) {
     document.body.removeChild(link);
 
     showToast("ส่งออกไฟล์สรุปยอดตามฝ่าย/กอง (CSV) สำเร็จแล้ว 📊");
+}
+
+// --- Export Summary Report to PDF ---
+function ensureHtml2PdfLoaded() {
+    if (typeof window.html2pdf !== "undefined") {
+        return Promise.resolve(true);
+    }
+    return new Promise((resolve) => {
+        const script = document.createElement("script");
+        script.src = "html2pdf.bundle.min.js";
+        script.onload = () => resolve(true);
+        script.onerror = () => {
+            const fallbackScript = document.createElement("script");
+            fallbackScript.src = "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js";
+            fallbackScript.onload = () => resolve(true);
+            fallbackScript.onerror = () => {
+                console.warn("Unable to load html2pdf library");
+                resolve(false);
+            };
+            document.head.appendChild(fallbackScript);
+        };
+        document.head.appendChild(script);
+    });
+}
+
+function generateSummaryPdfHtml(data) {
+    const { stats, grandTarget, grandCompleted, grandRemaining, grandCompPctStr } = data;
+    const grandCompPctVal = grandTarget > 0 ? (grandCompleted / grandTarget) * 100 : 0;
+    const currentDateThai = new Date().toLocaleDateString('th-TH', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric', 
+        hour: '2-digit', 
+        minute: '2-digit' 
+    });
+
+    const grandKpiColor = grandCompPctVal >= 80 ? "#059669" : grandCompPctVal >= 50 ? "#d97706" : "#dc2626";
+
+    let html = `
+    <div style="font-family: 'Noto Sans Thai', 'Sarabun', Tahoma, 'Segoe UI', sans-serif; color: #1e293b; background: #ffffff; padding: 12px 14px; width: 750px; box-sizing: border-box; line-height: 1.35;">
+        <!-- Header -->
+        <div style="border-bottom: 2.5px solid #1b4c9e; padding-bottom: 10px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: flex-start;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <div style="width: 44px; height: 44px; border-radius: 10px; background: linear-gradient(135deg, #1b4c9e 0%, #0f2c59 100%); display: flex; align-items: center; justify-content: center; color: #ffffff; font-weight: 800; font-size: 20px; box-shadow: 0 3px 8px rgba(27,76,158,0.25);">
+                    ⚡
+                </div>
+                <div>
+                    <div style="font-size: 11px; font-weight: 700; color: #1b4c9e; letter-spacing: 0.5px; text-transform: uppercase;">
+                        การไฟฟ้าฝ่ายผลิตแห่งประเทศไทย (กฟผ.) ไทรน้อย
+                    </div>
+                    <div style="font-size: 15px; font-weight: 800; color: #0f2c59; line-height: 1.25; margin-top: 1px;">
+                        รายงานสรุปผลการเข้าร่วมกิจกรรมและประเมินการรับชมสื่ออนุรักษ์พลังงาน
+                    </div>
+                    <div style="font-size: 10px; color: #64748b; margin-top: 2px;">
+                        EGAT Sainoi Smart Energy Video Hub • ข้อมูลสถิติความก้าวหน้ารายสังกัดฝ่ายและกอง
+                    </div>
+                </div>
+            </div>
+            <div style="text-align: right; min-width: 170px;">
+                <div style="font-size: 9.5px; color: #64748b;">ข้อมูล ณ วันที่</div>
+                <div style="font-size: 10.5px; font-weight: 700; color: #1b4c9e;">${currentDateThai} น.</div>
+                <div style="margin-top: 4px; display: inline-block; font-size: 9px; padding: 2px 7px; border-radius: 10px; background: #ecfdf5; color: #059669; font-weight: 700; border: 1px solid #a7f3d0;">
+                    รายงาน 6 คอลัมน์หลัก
+                </div>
+            </div>
+        </div>
+
+        <!-- Mini Executive KPI Summary Cards -->
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px;">
+            <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 7px 8px; text-align: center;">
+                <div style="font-size: 9.5px; color: #64748b; font-weight: 600;">เป้าหมายรวมทั้งหมด</div>
+                <div style="font-size: 15px; font-weight: 800; color: #1b4c9e; font-family: Tahoma, sans-serif; margin-top: 1px;">
+                    ${grandTarget.toLocaleString('en-US')} <span style="font-size: 9.5px; font-weight: normal; color: #64748b;">คน</span>
+                </div>
+            </div>
+            <div style="background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 6px; padding: 7px 8px; text-align: center;">
+                <div style="font-size: 9.5px; color: #059669; font-weight: 600;">ทำครบแล้วทั้งหมด</div>
+                <div style="font-size: 15px; font-weight: 800; color: #059669; font-family: Tahoma, sans-serif; margin-top: 1px;">
+                    ${grandCompleted.toLocaleString('en-US')} <span style="font-size: 9.5px; font-weight: normal; color: #059669;">คน</span>
+                </div>
+            </div>
+            <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 7px 8px; text-align: center;">
+                <div style="font-size: 9.5px; color: #d97706; font-weight: 600;">ยังไม่ทำ / คงเหลือ</div>
+                <div style="font-size: 15px; font-weight: 800; color: #d97706; font-family: Tahoma, sans-serif; margin-top: 1px;">
+                    ${grandRemaining.toLocaleString('en-US')} <span style="font-size: 9.5px; font-weight: normal; color: #d97706;">คน</span>
+                </div>
+            </div>
+            <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 7px 8px; text-align: center;">
+                <div style="font-size: 9.5px; color: #1d4ed8; font-weight: 600;">อัตราความสำเร็จภาพรวม</div>
+                <div style="font-size: 15px; font-weight: 800; color: ${grandKpiColor}; font-family: Tahoma, sans-serif; margin-top: 1px;">
+                    ${grandCompPctStr}
+                </div>
+            </div>
+        </div>
+
+        <!-- Table -->
+        <table style="width: 100%; border-collapse: collapse; font-size: 9pt; line-height: 1.35; page-break-inside: auto;">
+            <thead>
+                <tr style="background-color: #1b4c9e; color: #ffffff;">
+                    <th style="border: 1px solid #475569; padding: 6px 5px; width: 130px; text-align: center; font-weight: 700;">สังกัดฝ่าย</th>
+                    <th style="border: 1px solid #475569; padding: 6px 5px; width: 180px; text-align: center; font-weight: 700;">สังกัดกอง</th>
+                    <th style="border: 1px solid #475569; padding: 6px 5px; width: 100px; text-align: center; font-weight: 700;">เป้าหมาย (คน)</th>
+                    <th style="border: 1px solid #475569; padding: 6px 5px; width: 110px; text-align: center; font-weight: 700;">ทำครบแล้ว (คน)</th>
+                    <th style="border: 1px solid #475569; padding: 6px 5px; width: 120px; text-align: center; font-weight: 700;">ยังไม่ทำ/คงเหลือ (คน)</th>
+                    <th style="border: 1px solid #475569; padding: 6px 5px; width: 95px; text-align: center; font-weight: 700;">% ชมครบ</th>
+                </tr>
+            </thead>
+
+            <!-- Grand Total Row -->
+            <tbody style="page-break-inside: avoid; break-inside: avoid;">
+                <tr style="background-color: #0f2c59; color: #ffffff; font-weight: 700; font-size: 9.5pt;">
+                    <td colspan="2" style="border: 1px solid #0f2c59; padding: 7px 6px; text-align: center; color: #ffffff;">
+                        ภาพรวมทั้งหมด (รวมทุกฝ่าย/ทุกกอง)
+                    </td>
+                    <td style="border: 1px solid #0f2c59; padding: 7px 6px; text-align: center; color: #ffffff;">${grandTarget.toLocaleString('en-US')}</td>
+                    <td style="border: 1px solid #0f2c59; padding: 7px 6px; text-align: center; color: #34d399;">${grandCompleted.toLocaleString('en-US')}</td>
+                    <td style="border: 1px solid #0f2c59; padding: 7px 6px; text-align: center; color: #fbbf24;">${grandRemaining.toLocaleString('en-US')}</td>
+                    <td style="border: 1px solid #0f2c59; padding: 7px 6px; text-align: center; color: #34d399;">${grandCompPctStr}</td>
+                </tr>
+            </tbody>
+    `;
+
+    UNITS.forEach(u => {
+        const d = stats[u] || { total: 0, completed: 0, inProgress: 0 };
+        const target = (deptHeadcounts[u] !== undefined) ? parseInt(deptHeadcounts[u], 10) : (DEFAULT_HEADCOUNT[u] || 0);
+        const compCount = d.completed;
+        const remainingCount = target > 0 ? Math.max(0, target - compCount) : 0;
+        
+        const compPctVal = target > 0 ? (compCount / target) * 100 : 0;
+        const compPctStr = target > 0 ? compPctVal.toFixed(1) + "%" : "—";
+        const compColor = target > 0 ? (compPctVal >= 80 ? "#059669" : compPctVal >= 50 ? "#d97706" : "#dc2626") : "#64748b";
+
+        const divMap = deptDivisions[u] || {};
+        const configuredDivs = Object.keys(divMap);
+        const userDivs = Object.keys(stats[u]?.divisions || {});
+        const allDivNames = Array.from(new Set([...configuredDivs, ...userDivs]));
+
+        const totalRowsForDept = 1 + allDivNames.length;
+
+        html += `
+            <tbody style="page-break-inside: avoid; break-inside: avoid;">
+                <tr style="background-color: #f8fafc; font-weight: 700;">
+                    <td rowspan="${totalRowsForDept}" style="border: 1px solid #cbd5e1; padding: 6px 6px; text-align: center; vertical-align: middle; background-color: #f1f5f9; color: #0f2c59; font-weight: 700;">
+                        ${u}
+                    </td>
+                    <td style="border: 1px solid #cbd5e1; padding: 6px 7px; color: #1b4c9e; font-weight: 700;">
+                        ภาพรวมฝ่าย (รวมทุกกอง)
+                    </td>
+                    <td style="border: 1px solid #cbd5e1; padding: 6px 6px; text-align: center; font-weight: 700;">
+                        ${target > 0 ? target.toLocaleString('en-US') : '—'}
+                    </td>
+                    <td style="border: 1px solid #cbd5e1; padding: 6px 6px; text-align: center; color: #059669; font-weight: 700;">
+                        ${compCount.toLocaleString('en-US')}
+                    </td>
+                    <td style="border: 1px solid #cbd5e1; padding: 6px 6px; text-align: center; color: #d97706; font-weight: 700;">
+                        ${target > 0 ? remainingCount.toLocaleString('en-US') : '—'}
+                    </td>
+                    <td style="border: 1px solid #cbd5e1; padding: 6px 6px; text-align: center; color: ${compColor}; font-weight: 700;">
+                        ${compPctStr}
+                    </td>
+                </tr>
+        `;
+
+        allDivNames.forEach(divName => {
+            const divTarget = divMap[divName] !== undefined ? parseInt(divMap[divName], 10) : 0;
+            const divData = stats[u]?.divisions?.[divName] || { total: 0, completed: 0, inProgress: 0 };
+            const divComp = divData.completed;
+            const divRemaining = divTarget > 0 ? Math.max(0, divTarget - divComp) : 0;
+
+            const divCompPctVal = divTarget > 0 ? (divComp / divTarget) * 100 : 0;
+            const divCompPct = divTarget > 0 ? divCompPctVal.toFixed(1) + "%" : "—";
+            const divCompColor = divTarget > 0 ? (divCompPctVal >= 80 ? "#059669" : divCompPctVal >= 50 ? "#d97706" : "#dc2626") : "#64748b";
+
+            html += `
+                <tr style="background-color: #ffffff;">
+                    <td style="border: 1px solid #cbd5e1; padding: 5px 7px 5px 14px; color: #334155;">
+                        ${divName}
+                    </td>
+                    <td style="border: 1px solid #cbd5e1; padding: 5px 6px; text-align: center;">
+                        ${divTarget > 0 ? divTarget.toLocaleString('en-US') : '—'}
+                    </td>
+                    <td style="border: 1px solid #cbd5e1; padding: 5px 6px; text-align: center; color: #059669; font-weight: 600;">
+                        ${divComp.toLocaleString('en-US')}
+                    </td>
+                    <td style="border: 1px solid #cbd5e1; padding: 5px 6px; text-align: center; color: #d97706;">
+                        ${divTarget > 0 ? divRemaining.toLocaleString('en-US') : '—'}
+                    </td>
+                    <td style="border: 1px solid #cbd5e1; padding: 5px 6px; text-align: center; color: ${divCompColor}; font-weight: 600;">
+                        ${divCompPct}
+                    </td>
+                </tr>
+            `;
+        });
+
+        html += `</tbody>`;
+    });
+
+    html += `
+        </table>
+
+        <!-- Footer Note -->
+        <div style="margin-top: 12px; padding-top: 8px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; font-size: 8.5pt; color: #64748b;">
+            <div>
+                * ข้อมูลสรุปผลการดำเนินงาน กิจกรรมรณรงค์และปลูกจิตสำนึกการอนุรักษ์พลังงาน กฟผ. ไทรน้อย
+            </div>
+            <div>
+                ระบบสารสนเทศ EGAT Sainoi Smart Energy Video Hub
+            </div>
+        </div>
+    </div>
+    `;
+
+    return html;
+}
+
+async function exportSummaryToPDF(data) {
+    showToast("กำลังสร้างไฟล์ PDF สรุปยอด... 📄");
+
+    const isReady = await ensureHtml2PdfLoaded();
+    const pdfHtml = generateSummaryPdfHtml(data);
+
+    if (isReady && typeof window.html2pdf !== "undefined") {
+        try {
+            const container = document.createElement("div");
+            container.id = "temp-pdf-export-container";
+            container.style.position = "fixed";
+            container.style.left = "-9999px";
+            container.style.top = "0";
+            container.style.width = "750px";
+            container.style.backgroundColor = "#ffffff";
+            container.style.zIndex = "-9999";
+            container.innerHTML = pdfHtml;
+            document.body.appendChild(container);
+
+            await new Promise(resolve => setTimeout(resolve, 350));
+
+            const fileName = `EnergySave_Summary_Report_${new Date().toISOString().slice(0, 10)}.pdf`;
+            const opt = {
+                margin: [10, 8, 10, 8],
+                filename: fileName,
+                image: { type: "jpeg", quality: 0.98 },
+                html2canvas: {
+                    scale: 2,
+                    useCORS: true,
+                    letterRendering: true,
+                    logging: false
+                },
+                jsPDF: {
+                    unit: "mm",
+                    format: "a4",
+                    orientation: "portrait"
+                },
+                pagebreak: { mode: ["avoid-all", "css", "legacy"] }
+            };
+
+            await window.html2pdf().set(opt).from(container).save();
+            document.body.removeChild(container);
+            showToast("ส่งออกไฟล์สรุปยอดตามฝ่าย/กอง (PDF) สำเร็จแล้ว 📊");
+            return;
+        } catch (err) {
+            console.error("PDF generation failed, opening print window fallback:", err);
+            const existing = document.getElementById("temp-pdf-export-container");
+            if (existing) document.body.removeChild(existing);
+        }
+    }
+
+    // Fallback: Open Print dialog
+    openPrintSummaryWindow(pdfHtml);
+}
+
+function openPrintSummaryWindow(pdfHtml) {
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+        showToast("เบราว์เซอร์บล็อกหน้าต่างพิมพ์ กรุณาอนุญาตป๊อปอัปเพื่อบันทึก PDF", true);
+        return;
+    }
+    printWindow.document.write(`
+        <!DOCTYPE html>
+        <html lang="th">
+        <head>
+            <meta charset="UTF-8">
+            <title>รายงานสรุปผลการเข้าร่วมกิจกรรมอนุรักษ์พลังงาน กฟผ. ไทรน้อย (PDF)</title>
+            <link rel="preconnect" href="https://fonts.googleapis.com">
+            <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+            <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+            <style>
+                @page {
+                    size: A4 portrait;
+                    margin: 10mm 8mm;
+                }
+                * { box-sizing: border-box; }
+                body {
+                    margin: 0;
+                    padding: 0;
+                    background: #ffffff;
+                    font-family: 'Noto Sans Thai', 'Sarabun', Tahoma, sans-serif;
+                    color: #1e293b;
+                    -webkit-print-color-adjust: exact;
+                    print-color-adjust: exact;
+                }
+                @media print {
+                    .no-print { display: none !important; }
+                    body { padding: 0; }
+                }
+            </style>
+        </head>
+        <body>
+            <div style="padding: 10px; max-width: 800px; margin: 0 auto;">
+                <div class="no-print" style="margin-bottom: 15px; padding: 12px 16px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-size: 14px; color: #1e40af; font-weight: 600;">
+                        🖨️ หน้าต่างพิมพ์เอกสาร: เลือกปลายทางเป็น <b>"บันทึกเป็น PDF" (Save as PDF)</b> เพื่อดาวน์โหลดไฟล์
+                    </span>
+                    <button onclick="window.print()" style="padding: 6px 14px; background: #1b4c9e; color: white; border: none; border-radius: 6px; font-weight: 700; cursor: pointer;">
+                        พิมพ์ / บันทึก PDF
+                    </button>
+                </div>
+                ${pdfHtml}
+            </div>
+            <script>
+                window.onload = function() {
+                    setTimeout(function() {
+                        window.print();
+                    }, 300);
+                };
+            </script>
+        </body>
+        </html>
+    `);
+    printWindow.document.close();
+    showToast("เปิดหน้าต่างพิมพ์รายงานสรุปยอด (สามารถเลือก Save as PDF ได้) 🖨️");
 }
 
 // --- Export Participants Data to CSV ---

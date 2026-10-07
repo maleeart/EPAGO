@@ -36,7 +36,14 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <!-- Official YouTube IFrame Player API for guaranteed completion tracking -->
     <script src="https://www.youtube.com/iframe_api"></script>
-    <link rel="stylesheet" href="style.css?v=3.2">
+    <!-- html2pdf.js for Client-Side PDF Export (Local with CDN fallback) -->
+    <script src="html2pdf.bundle.min.js"></script>
+    <script>
+        if (typeof html2pdf === "undefined") {
+            document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"><\/script>');
+        }
+    </script>
+    <link rel="stylesheet" href="style.css?v=3.3">
 </head>
 <body>
     <!-- Background Decor Elements -->
@@ -412,6 +419,9 @@
                         <button class="btn btn-outline" onclick="exportSummaryReport('csv')">
                             <i data-lucide="file-text"></i> ส่งออกสรุปยอด (CSV)
                         </button>
+                        <button class="btn btn-pdf" onclick="exportSummaryReport('pdf')">
+                            <i data-lucide="file-down"></i> ส่งออกสรุปยอด (PDF)
+                        </button>
                         <button class="btn btn-outline" onclick="exportParticipantsToCSV()">
                             <i data-lucide="download"></i> ส่งออกรายชื่อผู้เข้าชม (CSV)
                         </button>
@@ -434,6 +444,9 @@
                             </button>
                             <button class="btn btn-outline" style="font-size: 0.8rem; padding: 0.35rem 0.75rem;" onclick="exportSummaryReport('csv')">
                                 <i data-lucide="file-text" style="width: 14px; height: 14px;"></i> ส่งออกสรุปยอด CSV
+                            </button>
+                            <button class="btn btn-pdf" style="font-size: 0.8rem; padding: 0.35rem 0.75rem;" onclick="exportSummaryReport('pdf')">
+                                <i data-lucide="file-down" style="width: 14px; height: 14px;"></i> ส่งออกสรุปยอด PDF
                             </button>
                             <button class="btn btn-outline" style="font-size: 0.8rem; padding: 0.35rem 0.75rem;" onclick="switchAdminTab('headcount')">
                                 <i data-lucide="sliders" style="width: 14px; height: 14px;"></i> กำหนดจำนวนบุคลากรเป้าหมาย
@@ -904,6 +917,6 @@
             lucide.createIcons();
         });
     </script>
-    <script src="app.js?v=3.2"></script>
+    <script src="app.js?v=3.3"></script>
 </body>
 </html>
