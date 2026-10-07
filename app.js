@@ -2705,20 +2705,20 @@ function renderAffiliationRegistrationSummary() {
                 </div>
             </td>
             <td style="text-align: center; font-weight: 700; font-family: 'Outfit', sans-serif; color: var(--blue-d);">${target > 0 ? target.toLocaleString('en-US') : '<span style="color:var(--text-secondary)">—</span>'}</td>
-            <td style="text-align: center; font-weight: 600; font-family: 'Outfit', sans-serif;">${regCount.toLocaleString('en-US')}</td>
-            <td style="text-align: center; font-weight: 600; font-family: 'Outfit', sans-serif; color: var(--blue);">${regPctStr}</td>
             <td style="text-align: center; color: #10b981; font-weight: 700; font-family: 'Outfit', sans-serif;">${compCount.toLocaleString('en-US')}</td>
             <td style="text-align: center; color: #f59e0b; font-weight: 700; font-family: 'Outfit', sans-serif;">${target > 0 ? remainingCount.toLocaleString('en-US') : '<span style="color:var(--text-secondary)">—</span>'}</td>
             <td style="text-align: center;">
                 ${target > 0 ? `
-                <div class="table-mini-progress">
-                    <span class="table-mini-progress-pct" style="color: ${compPctVal >= 80 ? '#10b981' : compPctVal >= 50 ? '#f59e0b' : '#ef4444'};">${compPctStr}</span>
-                    <div class="table-mini-progress-track">
-                        <div class="table-mini-progress-fill ${progressFillClass}" style="width: ${Math.min(100, Math.max(0, compPctVal))}%;"></div>
+                <div style="display: flex; align-items: center; justify-content: center; gap: 0.45rem;">
+                    <div class="table-mini-progress" style="flex: 1; max-width: 90px;">
+                        <span class="table-mini-progress-pct" style="color: ${compPctVal >= 80 ? '#10b981' : compPctVal >= 50 ? '#f59e0b' : '#ef4444'};">${compPctStr}</span>
+                        <div class="table-mini-progress-track">
+                            <div class="table-mini-progress-fill ${progressFillClass}" style="width: ${Math.min(100, Math.max(0, compPctVal))}%;"></div>
+                        </div>
                     </div>
+                    ${evalBadge}
                 </div>` : `<span style="color: var(--text-secondary);">—</span>`}
             </td>
-            <td style="text-align: center;">${evalBadge}</td>
         `;
         tbody.appendChild(tr);
 
@@ -2766,12 +2766,6 @@ function renderAffiliationRegistrationSummary() {
                     <td style="text-align: center; font-weight: 600; font-family: 'Outfit', sans-serif; color: var(--blue-d); font-size: 0.85rem;">
                         ${divTarget > 0 ? divTarget.toLocaleString('en-US') : '<span style="color:var(--text-secondary)">—</span>'}
                     </td>
-                    <td style="text-align: center; font-weight: 500; font-family: 'Outfit', sans-serif; font-size: 0.85rem;">
-                        ${divRegCount.toLocaleString('en-US')}
-                    </td>
-                    <td style="text-align: center; font-weight: 500; font-family: 'Outfit', sans-serif; color: var(--blue); font-size: 0.85rem;">
-                        ${divRegPctStr}
-                    </td>
                     <td style="text-align: center; color: #10b981; font-weight: 600; font-family: 'Outfit', sans-serif; font-size: 0.85rem;">
                         ${divCompCount.toLocaleString('en-US')}
                     </td>
@@ -2780,14 +2774,16 @@ function renderAffiliationRegistrationSummary() {
                     </td>
                     <td style="text-align: center;">
                         ${divTarget > 0 ? `
-                        <div class="table-mini-progress">
-                            <span class="table-mini-progress-pct" style="color: ${divCompPctVal >= 80 ? '#10b981' : divCompPctVal >= 50 ? '#f59e0b' : '#ef4444'}; font-size: 0.8rem;">${divCompPctStr}</span>
-                            <div class="table-mini-progress-track" style="height: 5px;">
-                                <div class="table-mini-progress-fill ${divProgressFillClass}" style="width: ${Math.min(100, Math.max(0, divCompPctVal))}%;"></div>
+                        <div style="display: flex; align-items: center; justify-content: center; gap: 0.4rem;">
+                            <div class="table-mini-progress" style="flex: 1; max-width: 80px;">
+                                <span class="table-mini-progress-pct" style="color: ${divCompPctVal >= 80 ? '#10b981' : divCompPctVal >= 50 ? '#f59e0b' : '#ef4444'}; font-size: 0.8rem;">${divCompPctStr}</span>
+                                <div class="table-mini-progress-track" style="height: 5px;">
+                                    <div class="table-mini-progress-fill ${divProgressFillClass}" style="width: ${Math.min(100, Math.max(0, divCompPctVal))}%;"></div>
+                                </div>
                             </div>
+                            ${divEvalBadge}
                         </div>` : `<span style="color: var(--text-secondary);">—</span>`}
                     </td>
-                    <td style="text-align: center;">${divEvalBadge}</td>
                 `;
                 tbody.appendChild(subTr);
             });
@@ -2816,20 +2812,20 @@ function renderAffiliationRegistrationSummary() {
     trTotal.innerHTML = `
         <td><strong style="color: var(--blue-d); font-size: 0.95rem;">รวมทุกฝ่าย / สังกัดทั้งหมด</strong></td>
         <td style="text-align: center; font-weight: 800; font-family: 'Outfit', sans-serif; font-size: 1.05rem; color: var(--blue-d);">${grandTarget.toLocaleString('en-US')}</td>
-        <td style="text-align: center; font-weight: 800; font-family: 'Outfit', sans-serif; font-size: 1.05rem; color: var(--blue-d);">${grandTotal.toLocaleString('en-US')}</td>
-        <td style="text-align: center; font-weight: 800; font-family: 'Outfit', sans-serif; font-size: 1rem; color: var(--blue);">${grandRegPctStr}</td>
         <td style="text-align: center; font-weight: 800; font-family: 'Outfit', sans-serif; font-size: 1.05rem; color: #10b981;">${grandCompleted.toLocaleString('en-US')}</td>
         <td style="text-align: center; font-weight: 800; font-family: 'Outfit', sans-serif; font-size: 1.05rem; color: #f59e0b;">${grandRemaining.toLocaleString('en-US')}</td>
         <td style="text-align: center;">
             ${grandTarget > 0 ? `
-            <div class="table-mini-progress">
-                <span class="table-mini-progress-pct" style="color: ${grandCompPctVal >= 80 ? '#10b981' : grandCompPctVal >= 50 ? '#f59e0b' : '#ef4444'}; font-size: 0.95rem;">${grandCompPctStr}</span>
-                <div class="table-mini-progress-track">
-                    <div class="table-mini-progress-fill ${grandProgressFillClass}" style="width: ${Math.min(100, Math.max(0, grandCompPctVal))}%;"></div>
+            <div style="display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+                <div class="table-mini-progress" style="flex: 1; max-width: 90px;">
+                    <span class="table-mini-progress-pct" style="color: ${grandCompPctVal >= 80 ? '#10b981' : grandCompPctVal >= 50 ? '#f59e0b' : '#ef4444'}; font-size: 0.95rem;">${grandCompPctStr}</span>
+                    <div class="table-mini-progress-track">
+                        <div class="table-mini-progress-fill ${grandProgressFillClass}" style="width: ${Math.min(100, Math.max(0, grandCompPctVal))}%;"></div>
+                    </div>
                 </div>
+                ${grandEvalBadge}
             </div>` : `<span style="color: var(--text-secondary);">—</span>`}
         </td>
-        <td style="text-align: center;">${grandEvalBadge}</td>
     `;
     tbody.appendChild(trTotal);
 
@@ -3452,7 +3448,7 @@ function exportSummaryReport(format = 'excel') {
 }
 
 function exportSummaryToExcel(data) {
-    const { stats, grandTarget, grandTotal, grandCompleted, grandInProgress, grandRemaining, grandRegPctStr, grandCompPctStr, grandEvalText } = data;
+    const { stats, grandTarget, grandCompleted, grandRemaining, grandCompPctStr } = data;
     
     let html = `
     <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
@@ -3478,13 +3474,10 @@ function exportSummaryToExcel(data) {
             td { border: 1px solid #cbd5e1; padding: 7px 9px; vertical-align: middle; }
             .dept-merged { background-color: #f1f5f9; font-weight: bold; text-align: center; vertical-align: middle; font-size: 11pt; color: #0f2c59; }
             .dept-summary-row { background-color: #f8fafc; font-weight: bold; }
-            .grand-total-row { background-color: #0f2c59; color: #ffffff; font-weight: bold; font-size: 12pt; }
+            .grand-total-row { background-color: #0f2c59; color: #ffffff; font-weight: bold; font-size: 11.5pt; }
             .grand-total-row td { border-color: #0f2c59; color: #ffffff; }
             .num-center { text-align: center; mso-number-format: "\\#\\,\\#\\#0"; }
-            .pct-center { text-align: center; }
-            .eval-high { color: #059669; font-weight: bold; text-align: center; }
-            .eval-med { color: #d97706; font-weight: bold; text-align: center; }
-            .eval-low { color: #dc2626; font-weight: bold; text-align: center; }
+            .pct-center { text-align: center; font-weight: bold; }
             .title-header { font-size: 15pt; font-weight: bold; color: #1b4c9e; text-align: center; }
             .subtitle-header { font-size: 10pt; color: #64748b; text-align: center; }
         </style>
@@ -3492,27 +3485,23 @@ function exportSummaryToExcel(data) {
     <body>
         <table>
             <tr>
-                <td colspan="10" class="title-header" style="border: none; padding-bottom: 4px;">
+                <td colspan="6" class="title-header" style="border: none; padding-bottom: 4px;">
                     รายงานสรุปผลการเข้าร่วมกิจกรรมและประเมินการรับชมสื่ออนุรักษ์พลังงาน กฟผ. ไทรน้อย
                 </td>
             </tr>
             <tr>
-                <td colspan="10" class="subtitle-header" style="border: none; padding-bottom: 12px;">
+                <td colspan="6" class="subtitle-header" style="border: none; padding-bottom: 12px;">
                     ข้อมูล ณ วันที่ ${new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })} น.
                 </td>
             </tr>
             <thead>
                 <tr>
-                    <th style="width: 140px;">สังกัดฝ่าย</th>
-                    <th style="width: 180px;">สังกัดกอง</th>
-                    <th style="width: 100px;">เป้าหมาย (คน)</th>
-                    <th style="width: 110px;">ลงทะเบียน (คน)</th>
-                    <th style="width: 110px;">ทำครบแล้ว (คน)</th>
-                    <th style="width: 110px;">กำลังทำ (คน)</th>
-                    <th style="width: 130px;">ยังไม่ทำ/คงเหลือ (คน)</th>
-                    <th style="width: 90px;">% ลงทะเบียน</th>
-                    <th style="width: 90px;">% ชมครบ</th>
-                    <th style="width: 100px;">ผลการประเมิน</th>
+                    <th style="width: 150px;">สังกัดฝ่าย</th>
+                    <th style="width: 200px;">สังกัดกอง</th>
+                    <th style="width: 120px;">เป้าหมาย (คน)</th>
+                    <th style="width: 130px;">ทำครบแล้ว (คน)</th>
+                    <th style="width: 140px;">ยังไม่ทำ/คงเหลือ (คน)</th>
+                    <th style="width: 110px;">% ชมครบ</th>
                 </tr>
             </thead>
             <tbody>
@@ -3520,29 +3509,21 @@ function exportSummaryToExcel(data) {
                 <tr class="grand-total-row">
                     <td colspan="2" style="text-align: center; font-weight: bold;">ภาพรวมทั้งหมด (รวมทุกฝ่าย/ทุกกอง)</td>
                     <td class="num-center" style="font-weight: bold;">${grandTarget.toLocaleString('en-US')}</td>
-                    <td class="num-center" style="font-weight: bold;">${grandTotal.toLocaleString('en-US')}</td>
                     <td class="num-center" style="font-weight: bold; color: #34d399;">${grandCompleted.toLocaleString('en-US')}</td>
-                    <td class="num-center" style="font-weight: bold;">${grandInProgress.toLocaleString('en-US')}</td>
                     <td class="num-center" style="font-weight: bold; color: #fbbf24;">${grandRemaining.toLocaleString('en-US')}</td>
-                    <td class="pct-center" style="font-weight: bold;">${grandRegPctStr}</td>
                     <td class="pct-center" style="font-weight: bold; color: #34d399;">${grandCompPctStr}</td>
-                    <td style="text-align: center; font-weight: bold;">${grandEvalText}</td>
                 </tr>
     `;
 
     UNITS.forEach(u => {
         const d = stats[u] || { total: 0, completed: 0, inProgress: 0 };
         const target = (deptHeadcounts[u] !== undefined) ? parseInt(deptHeadcounts[u], 10) : (DEFAULT_HEADCOUNT[u] || 0);
-        const regCount = d.total;
         const compCount = d.completed;
-        const inProgCount = d.inProgress;
         const remainingCount = target > 0 ? Math.max(0, target - compCount) : 0;
         
-        const regPctStr = target > 0 ? ((regCount / target) * 100).toFixed(1) + "%" : "—";
         const compPctVal = target > 0 ? (compCount / target) * 100 : 0;
         const compPctStr = target > 0 ? compPctVal.toFixed(1) + "%" : "—";
-        const evalClass = target > 0 ? (compPctVal >= 80 ? "eval-high" : compPctVal >= 50 ? "eval-med" : "eval-low") : "";
-        const evalText = target > 0 ? (compPctVal >= 80 ? "ดีเยี่ยม" : compPctVal >= 50 ? "ปานกลาง" : "ต้องติดตาม") : "—";
+        const compColor = target > 0 ? (compPctVal >= 80 ? "#059669" : compPctVal >= 50 ? "#d97706" : "#dc2626") : "#64748b";
 
         const divMap = deptDivisions[u] || {};
         const configuredDivs = Object.keys(divMap);
@@ -3558,13 +3539,9 @@ function exportSummaryToExcel(data) {
                 <td rowspan="${totalRowsForDept}" class="dept-merged">${u}</td>
                 <td style="font-weight: bold; color: #1b4c9e;">ภาพรวมฝ่าย (รวมทุกกอง)</td>
                 <td class="num-center" style="font-weight: bold;">${target > 0 ? target.toLocaleString('en-US') : '—'}</td>
-                <td class="num-center" style="font-weight: bold;">${regCount.toLocaleString('en-US')}</td>
                 <td class="num-center" style="font-weight: bold; color: #059669;">${compCount.toLocaleString('en-US')}</td>
-                <td class="num-center" style="font-weight: bold;">${inProgCount.toLocaleString('en-US')}</td>
                 <td class="num-center" style="font-weight: bold; color: #d97706;">${target > 0 ? remainingCount.toLocaleString('en-US') : '—'}</td>
-                <td class="pct-center" style="font-weight: bold;">${regPctStr}</td>
-                <td class="pct-center" style="font-weight: bold; color: #059669;">${compPctStr}</td>
-                <td class="${evalClass}">${evalText}</td>
+                <td class="pct-center" style="font-weight: bold; color: ${compColor};">${compPctStr}</td>
             </tr>
         `;
 
@@ -3572,28 +3549,20 @@ function exportSummaryToExcel(data) {
         allDivNames.forEach(divName => {
             const divTarget = divMap[divName] !== undefined ? parseInt(divMap[divName], 10) : 0;
             const divData = stats[u]?.divisions?.[divName] || { total: 0, completed: 0, inProgress: 0 };
-            const divReg = divData.total;
             const divComp = divData.completed;
-            const divInProg = divData.inProgress;
             const divRemaining = divTarget > 0 ? Math.max(0, divTarget - divComp) : 0;
 
-            const divRegPct = divTarget > 0 ? ((divReg / divTarget) * 100).toFixed(1) + "%" : "—";
             const divCompPctVal = divTarget > 0 ? (divComp / divTarget) * 100 : 0;
             const divCompPct = divTarget > 0 ? divCompPctVal.toFixed(1) + "%" : "—";
-            const divEvalClass = divTarget > 0 ? (divCompPctVal >= 80 ? "eval-high" : divCompPctVal >= 50 ? "eval-med" : "eval-low") : "";
-            const divEvalText = divTarget > 0 ? (divCompPctVal >= 80 ? "ดีเยี่ยม" : divCompPctVal >= 50 ? "ปานกลาง" : "ต้องติดตาม") : "—";
+            const divCompColor = divTarget > 0 ? (divCompPctVal >= 80 ? "#059669" : divCompPctVal >= 50 ? "#d97706" : "#dc2626") : "#64748b";
 
             html += `
                 <tr>
                     <td style="padding-left: 14px; color: #334155;">${divName}</td>
                     <td class="num-center">${divTarget > 0 ? divTarget.toLocaleString('en-US') : '—'}</td>
-                    <td class="num-center">${divReg.toLocaleString('en-US')}</td>
                     <td class="num-center" style="color: #059669; font-weight: 600;">${divComp.toLocaleString('en-US')}</td>
-                    <td class="num-center">${divInProg.toLocaleString('en-US')}</td>
                     <td class="num-center" style="color: #d97706;">${divTarget > 0 ? divRemaining.toLocaleString('en-US') : '—'}</td>
-                    <td class="pct-center">${divRegPct}</td>
-                    <td class="pct-center" style="color: #059669; font-weight: 600;">${divCompPct}</td>
-                    <td class="${divEvalClass}">${divEvalText}</td>
+                    <td class="pct-center" style="color: ${divCompColor}; font-weight: 600;">${divCompPct}</td>
                 </tr>
             `;
         });
@@ -3621,19 +3590,15 @@ function exportSummaryToExcel(data) {
 }
 
 function exportSummaryToCSV(data) {
-    const { stats, grandTarget, grandTotal, grandCompleted, grandInProgress, grandRemaining, grandRegPctStr, grandCompPctStr, grandEvalText } = data;
+    const { stats, grandTarget, grandCompleted, grandRemaining, grandCompPctStr } = data;
     
     let headers = [
         "สังกัดฝ่าย",
         "สังกัดกอง",
         "เป้าหมาย (คน)",
-        "ลงทะเบียนแล้ว (คน)",
-        "ทำครบทุกคลิปแล้ว (คน)",
-        "กำลังทำ/ยังไม่ครบ (คน)",
+        "ทำครบแล้ว (คน)",
         "ยังไม่ทำ/คงเหลือ (คน)",
-        "% การลงทะเบียน",
-        "% ทำครบตามเป้าหมาย",
-        "ผลการประเมิน"
+        "% ชมครบ"
     ];
 
     let csvContent = headers.map(h => `"${h.replace(/"/g, '""')}"`).join(",") + "\n";
@@ -3643,28 +3608,20 @@ function exportSummaryToCSV(data) {
         "ภาพรวมทั้งหมด (รวมทุกฝ่าย)",
         "ทุกสังกัดกอง",
         grandTarget,
-        grandTotal,
         grandCompleted,
-        grandInProgress,
         grandRemaining,
-        grandRegPctStr,
-        grandCompPctStr,
-        grandEvalText
+        grandCompPctStr
     ];
     csvContent += grandRow.map(c => `"${String(c).replace(/"/g, '""')}"`).join(",") + "\n";
 
     UNITS.forEach(u => {
         const d = stats[u] || { total: 0, completed: 0, inProgress: 0 };
         const target = (deptHeadcounts[u] !== undefined) ? parseInt(deptHeadcounts[u], 10) : (DEFAULT_HEADCOUNT[u] || 0);
-        const regCount = d.total;
         const compCount = d.completed;
-        const inProgCount = d.inProgress;
         const remainingCount = target > 0 ? Math.max(0, target - compCount) : 0;
         
-        const regPctStr = target > 0 ? ((regCount / target) * 100).toFixed(1) + "%" : "—";
         const compPctVal = target > 0 ? (compCount / target) * 100 : 0;
         const compPctStr = target > 0 ? compPctVal.toFixed(1) + "%" : "—";
-        const evalText = target > 0 ? (compPctVal >= 80 ? "ดีเยี่ยม" : compPctVal >= 50 ? "ปานกลาง" : "ต้องติดตาม") : "—";
 
         const divMap = deptDivisions[u] || {};
         const configuredDivs = Object.keys(divMap);
@@ -3676,13 +3633,9 @@ function exportSummaryToCSV(data) {
             u, // Department name on first row
             "ภาพรวมฝ่าย (รวมทุกกอง)",
             target > 0 ? target : "—",
-            regCount,
             compCount,
-            inProgCount,
             target > 0 ? remainingCount : "—",
-            regPctStr,
-            compPctStr,
-            evalText
+            compPctStr
         ];
         csvContent += deptSummaryRow.map(c => `"${String(c).replace(/"/g, '""')}"`).join(",") + "\n";
 
@@ -3690,27 +3643,19 @@ function exportSummaryToCSV(data) {
         allDivNames.forEach(divName => {
             const divTarget = divMap[divName] !== undefined ? parseInt(divMap[divName], 10) : 0;
             const divData = stats[u]?.divisions?.[divName] || { total: 0, completed: 0, inProgress: 0 };
-            const divReg = divData.total;
             const divComp = divData.completed;
-            const divInProg = divData.inProgress;
             const divRemaining = divTarget > 0 ? Math.max(0, divTarget - divComp) : 0;
 
-            const divRegPct = divTarget > 0 ? ((divReg / divTarget) * 100).toFixed(1) + "%" : "—";
             const divCompPctVal = divTarget > 0 ? (divComp / divTarget) * 100 : 0;
             const divCompPct = divTarget > 0 ? divCompPctVal.toFixed(1) + "%" : "—";
-            const divEvalText = divTarget > 0 ? (divCompPctVal >= 80 ? "ดีเยี่ยม" : divCompPctVal >= 50 ? "ปานกลาง" : "ต้องติดตาม") : "—";
 
             const divRow = [
                 "", // Blank for merged cell under department u
                 divName,
                 divTarget > 0 ? divTarget : "—",
-                divReg,
                 divComp,
-                divInProg,
                 divTarget > 0 ? divRemaining : "—",
-                divRegPct,
-                divCompPct,
-                divEvalText
+                divCompPct
             ];
             csvContent += divRow.map(c => `"${String(c).replace(/"/g, '""')}"`).join(",") + "\n";
         });
