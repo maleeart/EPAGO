@@ -2546,13 +2546,7 @@ function renderAdminDashboard() {
     renderHeadcountForm();
 }
 
-function renderAffiliationRegistrationSummary() {
-    const tbody = document.getElementById("admin-summary-dept-tbody");
-    if (!tbody) return;
-    
-    tbody.innerHTML = "";
-    
-    // Initialize statistics map for each unit and its divisions
+function getAffiliationSummaryData() {
     const stats = {};
     UNITS.forEach(u => {
         stats[u] = { total: 0, completed: 0, inProgress: 0, divisions: {} };
@@ -2610,6 +2604,49 @@ function renderAffiliationRegistrationSummary() {
             stats[deptKey].divisions[divKey].inProgress++;
         }
     });
+
+    let grandTarget = 0;
+    let grandTotal = 0;
+    let grandCompleted = 0;
+    let grandInProgress = 0;
+
+    UNITS.forEach(u => {
+        const target = (deptHeadcounts[u] !== undefined) ? parseInt(deptHeadcounts[u], 10) : (DEFAULT_HEADCOUNT[u] || 0);
+        if (target > 0) grandTarget += target;
+        const d = stats[u] || { total: 0, completed: 0, inProgress: 0 };
+        grandTotal += d.total;
+        grandCompleted += d.completed;
+        grandInProgress += d.inProgress;
+    });
+
+    const grandRemaining = Math.max(0, grandTarget - grandCompleted);
+    const grandRegPctStr = grandTarget > 0 ? ((grandTotal / grandTarget) * 100).toFixed(1) + "%" : "—";
+    const grandCompPctVal = grandTarget > 0 ? (grandCompleted / grandTarget) * 100 : 0;
+    const grandCompPctStr = grandTarget > 0 ? grandCompPctVal.toFixed(1) + "%" : "—";
+    const grandEvalText = grandTarget > 0 ? (grandCompPctVal >= 80 ? "ดีเยี่ยม" : grandCompPctVal >= 50 ? "ปานกลาง" : "ต้องติดตาม") : "—";
+
+    return {
+        stats,
+        grandTarget,
+        grandTotal,
+        grandCompleted,
+        grandInProgress,
+        grandRemaining,
+        grandRegPctStr,
+        grandCompPctVal,
+        grandCompPctStr,
+        grandEvalText
+    };
+}
+
+function renderAffiliationRegistrationSummary() {
+    const tbody = document.getElementById("admin-summary-dept-tbody");
+    if (!tbody) return;
+    
+    tbody.innerHTML = "";
+    
+    const summaryData = getAffiliationSummaryData();
+    const { stats, grandTarget, grandTotal, grandCompleted, grandRemaining, grandRegPctStr, grandCompPctVal, grandCompPctStr } = summaryData;
     
     // Render rows for each unit
     UNITS.forEach(u => {
@@ -2617,6 +2654,7 @@ function renderAffiliationRegistrationSummary() {
         const target = (deptHeadcounts[u] !== undefined) ? parseInt(deptHeadcounts[u], 10) : (DEFAULT_HEADCOUNT[u] || 0);
         const regCount = data.total;
         const compCount = data.completed;
+        const remainingCount = target > 0 ? Math.max(0, target - compCount) : 0;
 
         const divMap = deptDivisions[u] || {};
         const configuredDivs = Object.keys(divMap);
@@ -2670,6 +2708,7 @@ function renderAffiliationRegistrationSummary() {
             <td style="text-align: center; font-weight: 600; font-family: 'Outfit', sans-serif;">${regCount.toLocaleString('en-US')}</td>
             <td style="text-align: center; font-weight: 600; font-family: 'Outfit', sans-serif; color: var(--blue);">${regPctStr}</td>
             <td style="text-align: center; color: #10b981; font-weight: 700; font-family: 'Outfit', sans-serif;">${compCount.toLocaleString('en-US')}</td>
+            <td style="text-align: center; color: #f59e0b; font-weight: 700; font-family: 'Outfit', sans-serif;">${target > 0 ? remainingCount.toLocaleString('en-US') : '<span style="color:var(--text-secondary)">—</span>'}</td>
             <td style="text-align: center;">
                 ${target > 0 ? `
                 <div class="table-mini-progress">
@@ -2690,6 +2729,7 @@ function renderAffiliationRegistrationSummary() {
                 const divData = stats[u]?.divisions?.[divName] || { total: 0, completed: 0, inProgress: 0 };
                 const divRegCount = divData.total;
                 const divCompCount = divData.completed;
+                const divRemainingCount = divTarget > 0 ? Math.max(0, divTarget - divCompCount) : 0;
 
                 let divRegPctStr = "—";
                 if (divTarget > 0) {
@@ -2735,6 +2775,9 @@ function renderAffiliationRegistrationSummary() {
                     <td style="text-align: center; color: #10b981; font-weight: 600; font-family: 'Outfit', sans-serif; font-size: 0.85rem;">
                         ${divCompCount.toLocaleString('en-US')}
                     </td>
+                    <td style="text-align: center; color: #f59e0b; font-weight: 600; font-family: 'Outfit', sans-serif; font-size: 0.85rem;">
+                        ${divTarget > 0 ? divRemainingCount.toLocaleString('en-US') : '<span style="color:var(--text-secondary)">—</span>'}
+                    </td>
                     <td style="text-align: center;">
                         ${divTarget > 0 ? `
                         <div class="table-mini-progress">
@@ -2750,31 +2793,11 @@ function renderAffiliationRegistrationSummary() {
             });
         }
     });
-    
-    // Calculate Grand Total
-    let grandTarget = 0;
-    let grandTotal = 0;
-    let grandCompleted = 0;
-    
-    UNITS.forEach(u => {
-        const target = (deptHeadcounts[u] !== undefined) ? parseInt(deptHeadcounts[u], 10) : (DEFAULT_HEADCOUNT[u] || 0);
-        if (target > 0) grandTarget += target;
-        const d = stats[u] || { total: 0, completed: 0 };
-        grandTotal += d.total;
-        grandCompleted += d.completed;
-    });
 
-    let grandRegPctStr = "—";
-    let grandCompPctStr = "—";
-    let grandCompPctVal = 0;
     let grandEvalBadge = `<span class="badge-eval badge-eval-none">—</span>`;
     let grandProgressFillClass = "none";
 
     if (grandTarget > 0) {
-        grandRegPctStr = ((grandTotal / grandTarget) * 100).toFixed(1) + "%";
-        grandCompPctVal = (grandCompleted / grandTarget) * 100;
-        grandCompPctStr = grandCompPctVal.toFixed(1) + "%";
-
         if (grandCompPctVal >= 80) {
             grandEvalBadge = `<span class="badge-eval badge-eval-high"><i data-lucide="check-circle-2" style="width: 13px; height: 13px;"></i> ดีเยี่ยม</span>`;
             grandProgressFillClass = "high";
@@ -2796,6 +2819,7 @@ function renderAffiliationRegistrationSummary() {
         <td style="text-align: center; font-weight: 800; font-family: 'Outfit', sans-serif; font-size: 1.05rem; color: var(--blue-d);">${grandTotal.toLocaleString('en-US')}</td>
         <td style="text-align: center; font-weight: 800; font-family: 'Outfit', sans-serif; font-size: 1rem; color: var(--blue);">${grandRegPctStr}</td>
         <td style="text-align: center; font-weight: 800; font-family: 'Outfit', sans-serif; font-size: 1.05rem; color: #10b981;">${grandCompleted.toLocaleString('en-US')}</td>
+        <td style="text-align: center; font-weight: 800; font-family: 'Outfit', sans-serif; font-size: 1.05rem; color: #f59e0b;">${grandRemaining.toLocaleString('en-US')}</td>
         <td style="text-align: center;">
             ${grandTarget > 0 ? `
             <div class="table-mini-progress">
@@ -3415,6 +3439,294 @@ async function clearAllParticipants() {
         showToast("ล้างประวัติผู้เข้าร่วมกิจกรรมทั้งหมดแล้ว");
         renderAdminDashboard();
     }
+}
+
+// --- Export Summary Report by Department & Division (Excel / CSV) ---
+function exportSummaryReport(format = 'excel') {
+    const summaryData = getAffiliationSummaryData();
+    if (format === 'csv') {
+        exportSummaryToCSV(summaryData);
+    } else {
+        exportSummaryToExcel(summaryData);
+    }
+}
+
+function exportSummaryToExcel(data) {
+    const { stats, grandTarget, grandTotal, grandCompleted, grandInProgress, grandRemaining, grandRegPctStr, grandCompPctStr, grandEvalText } = data;
+    
+    let html = `
+    <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+        <!--[if gte mso 9]>
+        <xml>
+            <x:ExcelWorkbook>
+                <x:ExcelWorksheets>
+                    <x:ExcelWorksheet>
+                        <x:Name>สรุปข้อมูลตามฝ่ายและกอง</x:Name>
+                        <x:WorksheetOptions>
+                            <x:DisplayGridlines/>
+                        </x:WorksheetOptions>
+                    </x:ExcelWorksheet>
+                </x:ExcelWorksheets>
+            </x:ExcelWorkbook>
+        </xml>
+        <![endif]-->
+        <style>
+            table { border-collapse: collapse; width: 100%; font-family: Tahoma, 'Noto Sans Thai', 'Segoe UI', sans-serif; font-size: 11pt; }
+            th { background-color: #1b4c9e; color: #ffffff; border: 1px solid #94a3b8; padding: 10px 8px; text-align: center; font-weight: bold; }
+            td { border: 1px solid #cbd5e1; padding: 7px 9px; vertical-align: middle; }
+            .dept-merged { background-color: #f1f5f9; font-weight: bold; text-align: center; vertical-align: middle; font-size: 11pt; color: #0f2c59; }
+            .dept-summary-row { background-color: #f8fafc; font-weight: bold; }
+            .grand-total-row { background-color: #0f2c59; color: #ffffff; font-weight: bold; font-size: 12pt; }
+            .grand-total-row td { border-color: #0f2c59; color: #ffffff; }
+            .num-center { text-align: center; mso-number-format: "\\#\\,\\#\\#0"; }
+            .pct-center { text-align: center; }
+            .eval-high { color: #059669; font-weight: bold; text-align: center; }
+            .eval-med { color: #d97706; font-weight: bold; text-align: center; }
+            .eval-low { color: #dc2626; font-weight: bold; text-align: center; }
+            .title-header { font-size: 15pt; font-weight: bold; color: #1b4c9e; text-align: center; }
+            .subtitle-header { font-size: 10pt; color: #64748b; text-align: center; }
+        </style>
+    </head>
+    <body>
+        <table>
+            <tr>
+                <td colspan="10" class="title-header" style="border: none; padding-bottom: 4px;">
+                    รายงานสรุปผลการเข้าร่วมกิจกรรมและประเมินการรับชมสื่ออนุรักษ์พลังงาน กฟผ. ไทรน้อย
+                </td>
+            </tr>
+            <tr>
+                <td colspan="10" class="subtitle-header" style="border: none; padding-bottom: 12px;">
+                    ข้อมูล ณ วันที่ ${new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })} น.
+                </td>
+            </tr>
+            <thead>
+                <tr>
+                    <th style="width: 140px;">สังกัดฝ่าย</th>
+                    <th style="width: 180px;">สังกัดกอง</th>
+                    <th style="width: 100px;">เป้าหมาย (คน)</th>
+                    <th style="width: 110px;">ลงทะเบียน (คน)</th>
+                    <th style="width: 110px;">ทำครบแล้ว (คน)</th>
+                    <th style="width: 110px;">กำลังทำ (คน)</th>
+                    <th style="width: 130px;">ยังไม่ทำ/คงเหลือ (คน)</th>
+                    <th style="width: 90px;">% ลงทะเบียน</th>
+                    <th style="width: 90px;">% ชมครบ</th>
+                    <th style="width: 100px;">ผลการประเมิน</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- ภาพรวมทั้งหมด (Grand Total) แสดงบนสุดเพื่อให้เห็นทันที -->
+                <tr class="grand-total-row">
+                    <td colspan="2" style="text-align: center; font-weight: bold;">ภาพรวมทั้งหมด (รวมทุกฝ่าย/ทุกกอง)</td>
+                    <td class="num-center" style="font-weight: bold;">${grandTarget.toLocaleString('en-US')}</td>
+                    <td class="num-center" style="font-weight: bold;">${grandTotal.toLocaleString('en-US')}</td>
+                    <td class="num-center" style="font-weight: bold; color: #34d399;">${grandCompleted.toLocaleString('en-US')}</td>
+                    <td class="num-center" style="font-weight: bold;">${grandInProgress.toLocaleString('en-US')}</td>
+                    <td class="num-center" style="font-weight: bold; color: #fbbf24;">${grandRemaining.toLocaleString('en-US')}</td>
+                    <td class="pct-center" style="font-weight: bold;">${grandRegPctStr}</td>
+                    <td class="pct-center" style="font-weight: bold; color: #34d399;">${grandCompPctStr}</td>
+                    <td style="text-align: center; font-weight: bold;">${grandEvalText}</td>
+                </tr>
+    `;
+
+    UNITS.forEach(u => {
+        const d = stats[u] || { total: 0, completed: 0, inProgress: 0 };
+        const target = (deptHeadcounts[u] !== undefined) ? parseInt(deptHeadcounts[u], 10) : (DEFAULT_HEADCOUNT[u] || 0);
+        const regCount = d.total;
+        const compCount = d.completed;
+        const inProgCount = d.inProgress;
+        const remainingCount = target > 0 ? Math.max(0, target - compCount) : 0;
+        
+        const regPctStr = target > 0 ? ((regCount / target) * 100).toFixed(1) + "%" : "—";
+        const compPctVal = target > 0 ? (compCount / target) * 100 : 0;
+        const compPctStr = target > 0 ? compPctVal.toFixed(1) + "%" : "—";
+        const evalClass = target > 0 ? (compPctVal >= 80 ? "eval-high" : compPctVal >= 50 ? "eval-med" : "eval-low") : "";
+        const evalText = target > 0 ? (compPctVal >= 80 ? "ดีเยี่ยม" : compPctVal >= 50 ? "ปานกลาง" : "ต้องติดตาม") : "—";
+
+        const divMap = deptDivisions[u] || {};
+        const configuredDivs = Object.keys(divMap);
+        const userDivs = Object.keys(stats[u]?.divisions || {});
+        const allDivNames = Array.from(new Set([...configuredDivs, ...userDivs]));
+
+        // Total rows occupied by this department: 1 summary row + division rows
+        const totalRowsForDept = 1 + allDivNames.length;
+
+        // Row 1: Dept Summary with ROWSPAN to MERGE the Department column
+        html += `
+            <tr class="dept-summary-row">
+                <td rowspan="${totalRowsForDept}" class="dept-merged">${u}</td>
+                <td style="font-weight: bold; color: #1b4c9e;">ภาพรวมฝ่าย (รวมทุกกอง)</td>
+                <td class="num-center" style="font-weight: bold;">${target > 0 ? target.toLocaleString('en-US') : '—'}</td>
+                <td class="num-center" style="font-weight: bold;">${regCount.toLocaleString('en-US')}</td>
+                <td class="num-center" style="font-weight: bold; color: #059669;">${compCount.toLocaleString('en-US')}</td>
+                <td class="num-center" style="font-weight: bold;">${inProgCount.toLocaleString('en-US')}</td>
+                <td class="num-center" style="font-weight: bold; color: #d97706;">${target > 0 ? remainingCount.toLocaleString('en-US') : '—'}</td>
+                <td class="pct-center" style="font-weight: bold;">${regPctStr}</td>
+                <td class="pct-center" style="font-weight: bold; color: #059669;">${compPctStr}</td>
+                <td class="${evalClass}">${evalText}</td>
+            </tr>
+        `;
+
+        // Subsequent rows: Divisions under this department (no Department cell because it is merged by rowspan)
+        allDivNames.forEach(divName => {
+            const divTarget = divMap[divName] !== undefined ? parseInt(divMap[divName], 10) : 0;
+            const divData = stats[u]?.divisions?.[divName] || { total: 0, completed: 0, inProgress: 0 };
+            const divReg = divData.total;
+            const divComp = divData.completed;
+            const divInProg = divData.inProgress;
+            const divRemaining = divTarget > 0 ? Math.max(0, divTarget - divComp) : 0;
+
+            const divRegPct = divTarget > 0 ? ((divReg / divTarget) * 100).toFixed(1) + "%" : "—";
+            const divCompPctVal = divTarget > 0 ? (divComp / divTarget) * 100 : 0;
+            const divCompPct = divTarget > 0 ? divCompPctVal.toFixed(1) + "%" : "—";
+            const divEvalClass = divTarget > 0 ? (divCompPctVal >= 80 ? "eval-high" : divCompPctVal >= 50 ? "eval-med" : "eval-low") : "";
+            const divEvalText = divTarget > 0 ? (divCompPctVal >= 80 ? "ดีเยี่ยม" : divCompPctVal >= 50 ? "ปานกลาง" : "ต้องติดตาม") : "—";
+
+            html += `
+                <tr>
+                    <td style="padding-left: 14px; color: #334155;">${divName}</td>
+                    <td class="num-center">${divTarget > 0 ? divTarget.toLocaleString('en-US') : '—'}</td>
+                    <td class="num-center">${divReg.toLocaleString('en-US')}</td>
+                    <td class="num-center" style="color: #059669; font-weight: 600;">${divComp.toLocaleString('en-US')}</td>
+                    <td class="num-center">${divInProg.toLocaleString('en-US')}</td>
+                    <td class="num-center" style="color: #d97706;">${divTarget > 0 ? divRemaining.toLocaleString('en-US') : '—'}</td>
+                    <td class="pct-center">${divRegPct}</td>
+                    <td class="pct-center" style="color: #059669; font-weight: 600;">${divCompPct}</td>
+                    <td class="${divEvalClass}">${divEvalText}</td>
+                </tr>
+            `;
+        });
+    });
+
+    html += `
+            </tbody>
+        </table>
+    </body>
+    </html>
+    `;
+
+    // Download as Excel (.xls) file with UTF-8 BOM
+    const blob = new Blob(["\uFEFF" + html], { type: "application/vnd.ms-excel;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `EnergySave_Summary_Report_${new Date().toISOString().slice(0, 10)}.xls`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    showToast("ส่งออกไฟล์สรุปยอดตามฝ่าย/กอง (Excel) สำเร็จแล้ว 📊");
+}
+
+function exportSummaryToCSV(data) {
+    const { stats, grandTarget, grandTotal, grandCompleted, grandInProgress, grandRemaining, grandRegPctStr, grandCompPctStr, grandEvalText } = data;
+    
+    let headers = [
+        "สังกัดฝ่าย",
+        "สังกัดกอง",
+        "เป้าหมาย (คน)",
+        "ลงทะเบียนแล้ว (คน)",
+        "ทำครบทุกคลิปแล้ว (คน)",
+        "กำลังทำ/ยังไม่ครบ (คน)",
+        "ยังไม่ทำ/คงเหลือ (คน)",
+        "% การลงทะเบียน",
+        "% ทำครบตามเป้าหมาย",
+        "ผลการประเมิน"
+    ];
+
+    let csvContent = headers.map(h => `"${h.replace(/"/g, '""')}"`).join(",") + "\n";
+
+    // Grand Total row
+    const grandRow = [
+        "ภาพรวมทั้งหมด (รวมทุกฝ่าย)",
+        "ทุกสังกัดกอง",
+        grandTarget,
+        grandTotal,
+        grandCompleted,
+        grandInProgress,
+        grandRemaining,
+        grandRegPctStr,
+        grandCompPctStr,
+        grandEvalText
+    ];
+    csvContent += grandRow.map(c => `"${String(c).replace(/"/g, '""')}"`).join(",") + "\n";
+
+    UNITS.forEach(u => {
+        const d = stats[u] || { total: 0, completed: 0, inProgress: 0 };
+        const target = (deptHeadcounts[u] !== undefined) ? parseInt(deptHeadcounts[u], 10) : (DEFAULT_HEADCOUNT[u] || 0);
+        const regCount = d.total;
+        const compCount = d.completed;
+        const inProgCount = d.inProgress;
+        const remainingCount = target > 0 ? Math.max(0, target - compCount) : 0;
+        
+        const regPctStr = target > 0 ? ((regCount / target) * 100).toFixed(1) + "%" : "—";
+        const compPctVal = target > 0 ? (compCount / target) * 100 : 0;
+        const compPctStr = target > 0 ? compPctVal.toFixed(1) + "%" : "—";
+        const evalText = target > 0 ? (compPctVal >= 80 ? "ดีเยี่ยม" : compPctVal >= 50 ? "ปานกลาง" : "ต้องติดตาม") : "—";
+
+        const divMap = deptDivisions[u] || {};
+        const configuredDivs = Object.keys(divMap);
+        const userDivs = Object.keys(stats[u]?.divisions || {});
+        const allDivNames = Array.from(new Set([...configuredDivs, ...userDivs]));
+
+        // Department Summary Row
+        const deptSummaryRow = [
+            u, // Department name on first row
+            "ภาพรวมฝ่าย (รวมทุกกอง)",
+            target > 0 ? target : "—",
+            regCount,
+            compCount,
+            inProgCount,
+            target > 0 ? remainingCount : "—",
+            regPctStr,
+            compPctStr,
+            evalText
+        ];
+        csvContent += deptSummaryRow.map(c => `"${String(c).replace(/"/g, '""')}"`).join(",") + "\n";
+
+        // Subsequent division rows: Empty string in Department column represents merged cell under this department
+        allDivNames.forEach(divName => {
+            const divTarget = divMap[divName] !== undefined ? parseInt(divMap[divName], 10) : 0;
+            const divData = stats[u]?.divisions?.[divName] || { total: 0, completed: 0, inProgress: 0 };
+            const divReg = divData.total;
+            const divComp = divData.completed;
+            const divInProg = divData.inProgress;
+            const divRemaining = divTarget > 0 ? Math.max(0, divTarget - divComp) : 0;
+
+            const divRegPct = divTarget > 0 ? ((divReg / divTarget) * 100).toFixed(1) + "%" : "—";
+            const divCompPctVal = divTarget > 0 ? (divComp / divTarget) * 100 : 0;
+            const divCompPct = divTarget > 0 ? divCompPctVal.toFixed(1) + "%" : "—";
+            const divEvalText = divTarget > 0 ? (divCompPctVal >= 80 ? "ดีเยี่ยม" : divCompPctVal >= 50 ? "ปานกลาง" : "ต้องติดตาม") : "—";
+
+            const divRow = [
+                "", // Blank for merged cell under department u
+                divName,
+                divTarget > 0 ? divTarget : "—",
+                divReg,
+                divComp,
+                divInProg,
+                divTarget > 0 ? divRemaining : "—",
+                divRegPct,
+                divCompPct,
+                divEvalText
+            ];
+            csvContent += divRow.map(c => `"${String(c).replace(/"/g, '""')}"`).join(",") + "\n";
+        });
+    });
+
+    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `EnergySave_Summary_Report_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    showToast("ส่งออกไฟล์สรุปยอดตามฝ่าย/กอง (CSV) สำเร็จแล้ว 📊");
 }
 
 // --- Export Participants Data to CSV ---
