@@ -3443,10 +3443,14 @@ function exportSummaryReport(format = 'excel') {
     if (format === 'csv') {
         exportSummaryToCSV(summaryData);
     } else if (format === 'pdf') {
-        exportSummaryToPDF(summaryData);
+        openExecutivePdfModal(summaryData);
     } else {
         exportSummaryToExcel(summaryData);
     }
+}
+
+function exportSummaryToPDF(data) {
+    openExecutivePdfModal(data);
 }
 
 function exportSummaryToExcel(data) {
@@ -3676,7 +3680,7 @@ function exportSummaryToCSV(data) {
     showToast("ส่งออกไฟล์สรุปยอดตามฝ่าย/กอง (CSV) สำเร็จแล้ว 📊");
 }
 
-// --- Export Summary Report to PDF ---
+// --- Export Summary Report to PDF (Executive Quality) ---
 function ensureHtml2PdfLoaded() {
     if (typeof window.html2pdf !== "undefined") {
         return Promise.resolve(true);
@@ -3713,7 +3717,7 @@ function generateSummaryPdfHtml(data) {
     const grandKpiColor = grandCompPctVal >= 80 ? "#059669" : grandCompPctVal >= 50 ? "#d97706" : "#dc2626";
 
     let html = `
-    <div style="font-family: 'Noto Sans Thai', 'Sarabun', Tahoma, 'Segoe UI', sans-serif; color: #1e293b; background: #ffffff; padding: 12px 14px; width: 750px; box-sizing: border-box; line-height: 1.35;">
+    <div style="font-family: 'Noto Sans Thai', 'Sarabun', Tahoma, 'Segoe UI', sans-serif; color: #1e293b; background: #ffffff; padding: 14px 16px; width: 750px; box-sizing: border-box; line-height: 1.35;">
         <!-- Header -->
         <div style="border-bottom: 2.5px solid #1b4c9e; padding-bottom: 10px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: flex-start;">
             <div style="display: flex; align-items: center; gap: 12px;">
@@ -3728,7 +3732,7 @@ function generateSummaryPdfHtml(data) {
                         รายงานสรุปผลการเข้าร่วมกิจกรรมและประเมินการรับชมสื่ออนุรักษ์พลังงาน
                     </div>
                     <div style="font-size: 10px; color: #64748b; margin-top: 2px;">
-                        EGAT Sainoi Smart Energy Video Hub • ข้อมูลสถิติความก้าวหน้ารายสังกัดฝ่ายและกอง
+                        EGAT Sainoi Smart Energy Video Hub • เอกสารสรุปสำหรับผู้บริหาร ประจำปี 2567
                     </div>
                 </div>
             </div>
@@ -3736,32 +3740,32 @@ function generateSummaryPdfHtml(data) {
                 <div style="font-size: 9.5px; color: #64748b;">ข้อมูล ณ วันที่</div>
                 <div style="font-size: 10.5px; font-weight: 700; color: #1b4c9e;">${currentDateThai} น.</div>
                 <div style="margin-top: 4px; display: inline-block; font-size: 9px; padding: 2px 7px; border-radius: 10px; background: #ecfdf5; color: #059669; font-weight: 700; border: 1px solid #a7f3d0;">
-                    รายงาน 6 คอลัมน์หลัก
+                    สรุปภาพรวม 6 คอลัมน์หลัก
                 </div>
             </div>
         </div>
 
-        <!-- Mini Executive KPI Summary Cards -->
-        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px;">
-            <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 7px 8px; text-align: center;">
+        <!-- Mini Executive KPI Summary Cards (Using Flex for maximum html2canvas compatibility) -->
+        <div style="display: flex; gap: 8px; margin-bottom: 12px; width: 100%;">
+            <div style="flex: 1; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 7px 8px; text-align: center;">
                 <div style="font-size: 9.5px; color: #64748b; font-weight: 600;">เป้าหมายรวมทั้งหมด</div>
                 <div style="font-size: 15px; font-weight: 800; color: #1b4c9e; font-family: Tahoma, sans-serif; margin-top: 1px;">
                     ${grandTarget.toLocaleString('en-US')} <span style="font-size: 9.5px; font-weight: normal; color: #64748b;">คน</span>
                 </div>
             </div>
-            <div style="background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 6px; padding: 7px 8px; text-align: center;">
+            <div style="flex: 1; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 6px; padding: 7px 8px; text-align: center;">
                 <div style="font-size: 9.5px; color: #059669; font-weight: 600;">ทำครบแล้วทั้งหมด</div>
                 <div style="font-size: 15px; font-weight: 800; color: #059669; font-family: Tahoma, sans-serif; margin-top: 1px;">
                     ${grandCompleted.toLocaleString('en-US')} <span style="font-size: 9.5px; font-weight: normal; color: #059669;">คน</span>
                 </div>
             </div>
-            <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 7px 8px; text-align: center;">
+            <div style="flex: 1; background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 7px 8px; text-align: center;">
                 <div style="font-size: 9.5px; color: #d97706; font-weight: 600;">ยังไม่ทำ / คงเหลือ</div>
                 <div style="font-size: 15px; font-weight: 800; color: #d97706; font-family: Tahoma, sans-serif; margin-top: 1px;">
                     ${grandRemaining.toLocaleString('en-US')} <span style="font-size: 9.5px; font-weight: normal; color: #d97706;">คน</span>
                 </div>
             </div>
-            <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 7px 8px; text-align: center;">
+            <div style="flex: 1; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 7px 8px; text-align: center;">
                 <div style="font-size: 9.5px; color: #1d4ed8; font-weight: 600;">อัตราความสำเร็จภาพรวม</div>
                 <div style="font-size: 15px; font-weight: 800; color: ${grandKpiColor}; font-family: Tahoma, sans-serif; margin-top: 1px;">
                     ${grandCompPctStr}
@@ -3769,7 +3773,7 @@ function generateSummaryPdfHtml(data) {
             </div>
         </div>
 
-        <!-- Table -->
+        <!-- Table Section -->
         <table style="width: 100%; border-collapse: collapse; font-size: 9pt; line-height: 1.35; page-break-inside: auto;">
             <thead>
                 <tr style="background-color: #1b4c9e; color: #ffffff;">
@@ -3814,7 +3818,7 @@ function generateSummaryPdfHtml(data) {
         const totalRowsForDept = 1 + allDivNames.length;
 
         html += `
-            <tbody style="page-break-inside: avoid; break-inside: avoid;">
+            <tbody class="pdf-dept-group" style="page-break-inside: avoid; break-inside: avoid;">
                 <tr style="background-color: #f8fafc; font-weight: 700;">
                     <td rowspan="${totalRowsForDept}" style="border: 1px solid #cbd5e1; padding: 6px 6px; text-align: center; vertical-align: middle; background-color: #f1f5f9; color: #0f2c59; font-weight: 700;">
                         ${u}
@@ -3875,7 +3879,7 @@ function generateSummaryPdfHtml(data) {
         </table>
 
         <!-- Footer Note -->
-        <div style="margin-top: 12px; padding-top: 8px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; font-size: 8.5pt; color: #64748b;">
+        <div style="margin-top: 14px; padding-top: 8px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; font-size: 8.5pt; color: #64748b;">
             <div>
                 * ข้อมูลสรุปผลการดำเนินงาน กิจกรรมรณรงค์และปลูกจิตสำนึกการอนุรักษ์พลังงาน กฟผ. ไทรน้อย
             </div>
@@ -3889,26 +3893,61 @@ function generateSummaryPdfHtml(data) {
     return html;
 }
 
-async function exportSummaryToPDF(data) {
-    showToast("กำลังสร้างไฟล์ PDF สรุปยอด... 📄");
+// Open Executive PDF Preview & Export Modal
+function openExecutivePdfModal(customData = null) {
+    const summaryData = customData || getAffiliationSummaryData();
+    const modal = document.getElementById("admin-pdf-modal");
+    const contentArea = document.getElementById("pdf-report-content");
+    
+    if (!modal || !contentArea) {
+        // Fallback directly to print if modal elements are missing
+        const html = generateSummaryPdfHtml(summaryData);
+        openPrintSummaryWindow(html);
+        return;
+    }
 
-    const isReady = await ensureHtml2PdfLoaded();
-    const pdfHtml = generateSummaryPdfHtml(data);
+    // Render report HTML inside the visible preview container
+    contentArea.innerHTML = generateSummaryPdfHtml(summaryData);
+    modal.classList.remove("hidden");
+    if (window.lucide) lucide.createIcons();
 
-    if (isReady && typeof window.html2pdf !== "undefined") {
+    showToast("เปิดเอกสารสรุปผลสำหรับผู้บริหารเรียบร้อยแล้ว 📄");
+
+    // Automatically trigger PDF download after brief render settlement
+    setTimeout(() => {
+        downloadExecutivePdfNow();
+    }, 450);
+}
+
+function closeAdminPdfModal() {
+    const modal = document.getElementById("admin-pdf-modal");
+    if (modal) modal.classList.add("hidden");
+}
+
+async function downloadExecutivePdfNow() {
+    const reportElem = document.getElementById("pdf-report-content");
+    if (!reportElem) {
+        showToast("ไม่พบเนื้อหารายงานสำหรับดาวน์โหลด", true);
+        return;
+    }
+
+    const downloadBtn = document.getElementById("pdf-download-btn");
+    const originalBtnText = downloadBtn ? downloadBtn.innerHTML : "";
+    if (downloadBtn) {
+        downloadBtn.disabled = true;
+        downloadBtn.innerHTML = `<i data-lucide="loader" class="spin" style="width:15px;height:15px;"></i> กำลังบันทึก PDF...`;
+        if (window.lucide) lucide.createIcons();
+    }
+
+    showToast("กำลังประมวลผลไฟล์ PDF สรุปยอด... 📄");
+
+    await ensureHtml2PdfLoaded();
+
+    if (typeof window.html2pdf !== "undefined") {
         try {
-            const container = document.createElement("div");
-            container.id = "temp-pdf-export-container";
-            container.style.position = "fixed";
-            container.style.left = "-9999px";
-            container.style.top = "0";
-            container.style.width = "750px";
-            container.style.backgroundColor = "#ffffff";
-            container.style.zIndex = "-9999";
-            container.innerHTML = pdfHtml;
-            document.body.appendChild(container);
-
-            await new Promise(resolve => setTimeout(resolve, 350));
+            // Scroll preview to top before capturing to ensure 100% full capture
+            const scrollWrapper = document.getElementById("pdf-preview-scroll-wrapper");
+            if (scrollWrapper) scrollWrapper.scrollTop = 0;
 
             const fileName = `EnergySave_Summary_Report_${new Date().toISOString().slice(0, 10)}.pdf`;
             const opt = {
@@ -3918,30 +3957,56 @@ async function exportSummaryToPDF(data) {
                 html2canvas: {
                     scale: 2,
                     useCORS: true,
-                    letterRendering: true,
-                    logging: false
+                    logging: false,
+                    scrollY: 0,
+                    scrollX: 0
                 },
                 jsPDF: {
                     unit: "mm",
                     format: "a4",
                     orientation: "portrait"
                 },
-                pagebreak: { mode: ["avoid-all", "css", "legacy"] }
+                pagebreak: { mode: ["css", "legacy"] }
             };
 
-            await window.html2pdf().set(opt).from(container).save();
-            document.body.removeChild(container);
-            showToast("ส่งออกไฟล์สรุปยอดตามฝ่าย/กอง (PDF) สำเร็จแล้ว 📊");
-            return;
+            await window.html2pdf().set(opt).from(reportElem).save();
+
+            showToast("ดาวน์โหลดไฟล์ PDF เรียบร้อยแล้ว 📊 (พร้อมนำเสนอ)");
         } catch (err) {
-            console.error("PDF generation failed, opening print window fallback:", err);
-            const existing = document.getElementById("temp-pdf-export-container");
-            if (existing) document.body.removeChild(existing);
+            console.error("Direct html2pdf error:", err);
+            showToast("สคริปต์ดาวน์โหลดขัดข้อง กำลังเปิดหน้าต่างพิมพ์เป็น PDF แทน...", true);
+            setTimeout(() => {
+                printExecutiveReportNow();
+            }, 600);
+        } finally {
+            if (downloadBtn) {
+                downloadBtn.disabled = false;
+                downloadBtn.innerHTML = originalBtnText;
+                if (window.lucide) lucide.createIcons();
+            }
+        }
+    } else {
+        showToast("เปิดหน้าต่างพิมพ์รายงาน (เลือก Save as PDF ได้ทันที) 🖨️");
+        printExecutiveReportNow();
+        if (downloadBtn) {
+            downloadBtn.disabled = false;
+            downloadBtn.innerHTML = originalBtnText;
+            if (window.lucide) lucide.createIcons();
         }
     }
+}
 
-    // Fallback: Open Print dialog
-    openPrintSummaryWindow(pdfHtml);
+// Native vector print-to-PDF
+function printExecutiveReportNow() {
+    const modal = document.getElementById("admin-pdf-modal");
+    if (modal && modal.classList.contains("hidden")) {
+        modal.classList.remove("hidden");
+    }
+    
+    // Slight timeout to let layout settle before print trigger
+    setTimeout(() => {
+        window.print();
+    }, 150);
 }
 
 function openPrintSummaryWindow(pdfHtml) {

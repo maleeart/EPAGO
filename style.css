@@ -2149,3 +2149,95 @@ body.admin-mode .hero-banner {
         height: 100px !important;
     }
 }
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.spin {
+    animation: spin 1s linear infinite;
+}
+
+/* ==========================================================================
+   Print Styles for Executive PDF Report
+   ========================================================================== */
+@media print {
+    @page {
+        size: A4 portrait;
+        margin: 10mm 8mm;
+    }
+    
+    html, body {
+        background: #ffffff !important;
+        color: #000000 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+
+    /* Hide everything on the page except the executive PDF modal */
+    body > *:not(#admin-pdf-modal) {
+        display: none !important;
+    }
+
+    /* Make the executive PDF modal take over the entire printed sheet */
+    #admin-pdf-modal {
+        display: block !important;
+        position: static !important;
+        width: 100% !important;
+        height: auto !important;
+        background: transparent !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        overflow: visible !important;
+        z-index: auto !important;
+    }
+
+    #admin-pdf-modal .modal-card {
+        background: transparent !important;
+        box-shadow: none !important;
+        border: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        max-width: 100% !important;
+        width: 100% !important;
+        max-height: none !important;
+        overflow: visible !important;
+    }
+
+    /* Hide modal header bar, close button, and action buttons during print */
+    #admin-pdf-modal .modal-close,
+    #admin-pdf-modal-header-bar,
+    .no-print {
+        display: none !important;
+    }
+
+    #pdf-preview-scroll-wrapper {
+        background: transparent !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        overflow: visible !important;
+        display: block !important;
+    }
+
+    #pdf-report-content {
+        box-shadow: none !important;
+        border: none !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    /* Keep table rows and department blocks from awkward page splits */
+    tr, .pdf-dept-group, tbody {
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+    }
+
+    thead {
+        display: table-header-group !important;
+    }
+}

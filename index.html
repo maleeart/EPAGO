@@ -43,7 +43,7 @@
             document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"><\/script>');
         }
     </script>
-    <link rel="stylesheet" href="style.css?v=3.3">
+    <link rel="stylesheet" href="style.css?v=3.4">
 </head>
 <body>
     <!-- Background Decor Elements -->
@@ -904,6 +904,41 @@
         </div>
     </div>
 
+    <!-- EXECUTIVE PDF REPORT PREVIEW & EXPORT MODAL -->
+    <div id="admin-pdf-modal" class="modal-overlay hidden" style="z-index: 10000;" onclick="if (event.target === this) closeAdminPdfModal()">
+        <div class="glass-card modal-card" style="max-width: 860px; width: 95vw; max-height: 94vh; display: flex; flex-direction: column; padding: 1.25rem;">
+            <!-- Modal Header Bar -->
+            <div id="admin-pdf-modal-header-bar" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px solid var(--border-color); padding-bottom: 0.85rem; margin-bottom: 0.85rem; flex-wrap: wrap; gap: 0.5rem;">
+                <div>
+                    <h3 style="margin: 0; color: var(--blue-d); font-size: 1.15rem; display: flex; align-items: center; gap: 0.45rem;">
+                        <i data-lucide="file-text" style="color: #e11d48; width: 22px; height: 22px;"></i> รายงานสรุปผลสำหรับผู้บริหาร (Executive PDF Report)
+                    </h3>
+                    <p style="margin: 0.2rem 0 0 0; font-size: 0.82rem; color: var(--text-secondary);">
+                        เอกสารสรุปความก้าวหน้ารายฝ่าย/กอง • ดาวน์โหลดไฟล์ .pdf หรือพิมพ์/บันทึก PDF คุณภาพสูงได้ทันที
+                    </p>
+                </div>
+                <div style="display: flex; gap: 0.45rem; align-items: center; flex-wrap: wrap;">
+                    <button id="pdf-download-btn" class="btn btn-pdf" style="font-size: 0.85rem; padding: 0.45rem 0.95rem;" onclick="downloadExecutivePdfNow()">
+                        <i data-lucide="download" style="width: 15px; height: 15px;"></i> ดาวน์โหลดไฟล์ PDF (.pdf)
+                    </button>
+                    <button class="btn btn-primary" style="font-size: 0.85rem; padding: 0.45rem 0.95rem;" onclick="printExecutiveReportNow()">
+                        <i data-lucide="printer" style="width: 15px; height: 15px;"></i> พิมพ์ / บันทึกเป็น PDF (คมชัดสูง)
+                    </button>
+                    <button class="modal-close" style="position: static; margin-left: 0.25rem;" onclick="closeAdminPdfModal()">
+                        <i data-lucide="x"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Scrollable Preview Area -->
+            <div id="pdf-preview-scroll-wrapper" style="flex: 1; overflow-y: auto; background: #cbd5e1; padding: 1rem; border-radius: 8px; display: flex; justify-content: center;">
+                <div id="pdf-report-content" style="background: #ffffff; box-shadow: 0 4px 20px rgba(0,0,0,0.18); border-radius: 4px; width: 750px; max-width: 100%;">
+                    <!-- Dynamically populated by JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Notification Toast -->
     <div id="toast" class="toast hidden">
         <i id="toast-icon" data-lucide="info"></i>
@@ -917,6 +952,6 @@
             lucide.createIcons();
         });
     </script>
-    <script src="app.js?v=3.3"></script>
+    <script src="app.js?v=3.4"></script>
 </body>
 </html>
