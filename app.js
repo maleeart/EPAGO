@@ -2619,9 +2619,11 @@ function getAffiliationSummaryData() {
         grandInProgress += d.inProgress;
     });
 
-    const grandRemaining = Math.max(0, grandTarget - grandCompleted);
-    const grandRegPctStr = grandTarget > 0 ? ((grandTotal / grandTarget) * 100).toFixed(1) + "%" : "—";
-    const grandCompPctVal = grandTarget > 0 ? (grandCompleted / grandTarget) * 100 : 0;
+    const rawGrandCompleted = grandCompleted;
+    const displayGrandCompleted = grandTarget > 0 ? Math.min(rawGrandCompleted, grandTarget) : rawGrandCompleted;
+    const grandRemaining = grandTarget > 0 ? Math.max(0, grandTarget - rawGrandCompleted) : 0;
+    const grandRegPctStr = grandTarget > 0 ? (Math.min(100, (grandTotal / grandTarget) * 100)).toFixed(1) + "%" : "—";
+    const grandCompPctVal = grandTarget > 0 ? Math.min(100, (rawGrandCompleted / grandTarget) * 100) : 0;
     const grandCompPctStr = grandTarget > 0 ? grandCompPctVal.toFixed(1) + "%" : "—";
     const grandEvalText = grandTarget > 0 ? (grandCompPctVal >= 80 ? "ดีเยี่ยม" : grandCompPctVal >= 50 ? "ปานกลาง" : "ต้องติดตาม") : "—";
 
@@ -2629,7 +2631,8 @@ function getAffiliationSummaryData() {
         stats,
         grandTarget,
         grandTotal,
-        grandCompleted,
+        rawGrandCompleted,
+        grandCompleted: displayGrandCompleted,
         grandInProgress,
         grandRemaining,
         grandRegPctStr,
@@ -2652,9 +2655,11 @@ function renderAffiliationRegistrationSummary() {
     UNITS.forEach(u => {
         const data = stats[u] || { total: 0, completed: 0, inProgress: 0 };
         const target = (deptHeadcounts[u] !== undefined) ? parseInt(deptHeadcounts[u], 10) : (DEFAULT_HEADCOUNT[u] || 0);
-        const regCount = data.total;
-        const compCount = data.completed;
-        const remainingCount = target > 0 ? Math.max(0, target - compCount) : 0;
+        const rawRegCount = data.total;
+        const regCount = target > 0 ? Math.min(rawRegCount, target) : rawRegCount;
+        const rawCompCount = data.completed;
+        const compCount = target > 0 ? Math.min(rawCompCount, target) : rawCompCount;
+        const remainingCount = target > 0 ? Math.max(0, target - rawCompCount) : 0;
 
         const divMap = deptDivisions[u] || {};
         const configuredDivs = Object.keys(divMap);
@@ -2667,7 +2672,7 @@ function renderAffiliationRegistrationSummary() {
         // % Registered
         let regPctStr = "—";
         if (target > 0) {
-            regPctStr = ((regCount / target) * 100).toFixed(1) + "%";
+            regPctStr = (Math.min(100, (rawRegCount / target) * 100)).toFixed(1) + "%";
         }
 
         // % Completed & Evaluation
@@ -2677,7 +2682,7 @@ function renderAffiliationRegistrationSummary() {
         let progressFillClass = "none";
 
         if (target > 0) {
-            compPctVal = (compCount / target) * 100;
+            compPctVal = Math.min(100, (rawCompCount / target) * 100);
             compPctStr = compPctVal.toFixed(1) + "%";
             
             if (compPctVal >= 80) {
@@ -2727,13 +2732,15 @@ function renderAffiliationRegistrationSummary() {
             allDivNames.forEach(divName => {
                 const divTarget = divMap[divName] !== undefined ? parseInt(divMap[divName], 10) : 0;
                 const divData = stats[u]?.divisions?.[divName] || { total: 0, completed: 0, inProgress: 0 };
-                const divRegCount = divData.total;
-                const divCompCount = divData.completed;
-                const divRemainingCount = divTarget > 0 ? Math.max(0, divTarget - divCompCount) : 0;
+                const rawDivReg = divData.total;
+                const divRegCount = divTarget > 0 ? Math.min(rawDivReg, divTarget) : rawDivReg;
+                const rawDivComp = divData.completed;
+                const divCompCount = divTarget > 0 ? Math.min(rawDivComp, divTarget) : rawDivComp;
+                const divRemainingCount = divTarget > 0 ? Math.max(0, divTarget - rawDivComp) : 0;
 
                 let divRegPctStr = "—";
                 if (divTarget > 0) {
-                    divRegPctStr = ((divRegCount / divTarget) * 100).toFixed(1) + "%";
+                    divRegPctStr = (Math.min(100, (rawDivReg / divTarget) * 100)).toFixed(1) + "%";
                 }
 
                 let divCompPctStr = "—";
@@ -2742,7 +2749,7 @@ function renderAffiliationRegistrationSummary() {
                 let divProgressFillClass = "none";
 
                 if (divTarget > 0) {
-                    divCompPctVal = (divCompCount / divTarget) * 100;
+                    divCompPctVal = Math.min(100, (rawDivComp / divTarget) * 100);
                     divCompPctStr = divCompPctVal.toFixed(1) + "%";
                     
                     if (divCompPctVal >= 80) {
@@ -3524,10 +3531,11 @@ function exportSummaryToExcel(data) {
     UNITS.forEach(u => {
         const d = stats[u] || { total: 0, completed: 0, inProgress: 0 };
         const target = (deptHeadcounts[u] !== undefined) ? parseInt(deptHeadcounts[u], 10) : (DEFAULT_HEADCOUNT[u] || 0);
-        const compCount = d.completed;
-        const remainingCount = target > 0 ? Math.max(0, target - compCount) : 0;
+        const rawCompCount = d.completed;
+        const compCount = target > 0 ? Math.min(rawCompCount, target) : rawCompCount;
+        const remainingCount = target > 0 ? Math.max(0, target - rawCompCount) : 0;
         
-        const compPctVal = target > 0 ? (compCount / target) * 100 : 0;
+        const compPctVal = target > 0 ? Math.min(100, (rawCompCount / target) * 100) : 0;
         const compPctStr = target > 0 ? compPctVal.toFixed(1) + "%" : "—";
         const compColor = target > 0 ? (compPctVal >= 80 ? "#059669" : compPctVal >= 50 ? "#d97706" : "#dc2626") : "#64748b";
 
@@ -3555,10 +3563,11 @@ function exportSummaryToExcel(data) {
         allDivNames.forEach(divName => {
             const divTarget = divMap[divName] !== undefined ? parseInt(divMap[divName], 10) : 0;
             const divData = stats[u]?.divisions?.[divName] || { total: 0, completed: 0, inProgress: 0 };
-            const divComp = divData.completed;
-            const divRemaining = divTarget > 0 ? Math.max(0, divTarget - divComp) : 0;
+            const rawDivComp = divData.completed;
+            const divComp = divTarget > 0 ? Math.min(rawDivComp, divTarget) : rawDivComp;
+            const divRemaining = divTarget > 0 ? Math.max(0, divTarget - rawDivComp) : 0;
 
-            const divCompPctVal = divTarget > 0 ? (divComp / divTarget) * 100 : 0;
+            const divCompPctVal = divTarget > 0 ? Math.min(100, (rawDivComp / divTarget) * 100) : 0;
             const divCompPct = divTarget > 0 ? divCompPctVal.toFixed(1) + "%" : "—";
             const divCompColor = divTarget > 0 ? (divCompPctVal >= 80 ? "#059669" : divCompPctVal >= 50 ? "#d97706" : "#dc2626") : "#64748b";
 
@@ -3623,10 +3632,11 @@ function exportSummaryToCSV(data) {
     UNITS.forEach(u => {
         const d = stats[u] || { total: 0, completed: 0, inProgress: 0 };
         const target = (deptHeadcounts[u] !== undefined) ? parseInt(deptHeadcounts[u], 10) : (DEFAULT_HEADCOUNT[u] || 0);
-        const compCount = d.completed;
-        const remainingCount = target > 0 ? Math.max(0, target - compCount) : 0;
+        const rawCompCount = d.completed;
+        const compCount = target > 0 ? Math.min(rawCompCount, target) : rawCompCount;
+        const remainingCount = target > 0 ? Math.max(0, target - rawCompCount) : 0;
         
-        const compPctVal = target > 0 ? (compCount / target) * 100 : 0;
+        const compPctVal = target > 0 ? Math.min(100, (rawCompCount / target) * 100) : 0;
         const compPctStr = target > 0 ? compPctVal.toFixed(1) + "%" : "—";
 
         const divMap = deptDivisions[u] || {};
@@ -3649,10 +3659,11 @@ function exportSummaryToCSV(data) {
         allDivNames.forEach(divName => {
             const divTarget = divMap[divName] !== undefined ? parseInt(divMap[divName], 10) : 0;
             const divData = stats[u]?.divisions?.[divName] || { total: 0, completed: 0, inProgress: 0 };
-            const divComp = divData.completed;
-            const divRemaining = divTarget > 0 ? Math.max(0, divTarget - divComp) : 0;
+            const rawDivComp = divData.completed;
+            const divComp = divTarget > 0 ? Math.min(rawDivComp, divTarget) : rawDivComp;
+            const divRemaining = divTarget > 0 ? Math.max(0, divTarget - rawDivComp) : 0;
 
-            const divCompPctVal = divTarget > 0 ? (divComp / divTarget) * 100 : 0;
+            const divCompPctVal = divTarget > 0 ? Math.min(100, (rawDivComp / divTarget) * 100) : 0;
             const divCompPct = divTarget > 0 ? divCompPctVal.toFixed(1) + "%" : "—";
 
             const divRow = [
@@ -3803,10 +3814,11 @@ function generateSummaryPdfHtml(data) {
     UNITS.forEach(u => {
         const d = stats[u] || { total: 0, completed: 0, inProgress: 0 };
         const target = (deptHeadcounts[u] !== undefined) ? parseInt(deptHeadcounts[u], 10) : (DEFAULT_HEADCOUNT[u] || 0);
-        const compCount = d.completed;
-        const remainingCount = target > 0 ? Math.max(0, target - compCount) : 0;
+        const rawCompCount = d.completed;
+        const compCount = target > 0 ? Math.min(rawCompCount, target) : rawCompCount;
+        const remainingCount = target > 0 ? Math.max(0, target - rawCompCount) : 0;
         
-        const compPctVal = target > 0 ? (compCount / target) * 100 : 0;
+        const compPctVal = target > 0 ? Math.min(100, (rawCompCount / target) * 100) : 0;
         const compPctStr = target > 0 ? compPctVal.toFixed(1) + "%" : "—";
         const compColor = target > 0 ? (compPctVal >= 80 ? "#059669" : compPctVal >= 50 ? "#d97706" : "#dc2626") : "#64748b";
 
@@ -3844,10 +3856,11 @@ function generateSummaryPdfHtml(data) {
         allDivNames.forEach(divName => {
             const divTarget = divMap[divName] !== undefined ? parseInt(divMap[divName], 10) : 0;
             const divData = stats[u]?.divisions?.[divName] || { total: 0, completed: 0, inProgress: 0 };
-            const divComp = divData.completed;
-            const divRemaining = divTarget > 0 ? Math.max(0, divTarget - divComp) : 0;
+            const rawDivComp = divData.completed;
+            const divComp = divTarget > 0 ? Math.min(rawDivComp, divTarget) : rawDivComp;
+            const divRemaining = divTarget > 0 ? Math.max(0, divTarget - rawDivComp) : 0;
 
-            const divCompPctVal = divTarget > 0 ? (divComp / divTarget) * 100 : 0;
+            const divCompPctVal = divTarget > 0 ? Math.min(100, (rawDivComp / divTarget) * 100) : 0;
             const divCompPct = divTarget > 0 ? divCompPctVal.toFixed(1) + "%" : "—";
             const divCompColor = divTarget > 0 ? (divCompPctVal >= 80 ? "#059669" : divCompPctVal >= 50 ? "#d97706" : "#dc2626") : "#64748b";
 
