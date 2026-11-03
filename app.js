@@ -3744,7 +3744,7 @@ function generateSummaryPdfHtml(data) {
                         รายงานสรุปผลการเข้าร่วมกิจกรรมและประเมินการรับชมสื่ออนุรักษ์พลังงาน
                     </div>
                     <div style="font-size: 10px; color: #64748b; margin-top: 2px;">
-                        EGAT Sainoi Smart Energy Video Hub • เอกสารสรุปสำหรับผู้บริหาร ประจำปี 2567
+                        EGAT Sainoi Smart Energy Video Hub
                     </div>
                 </div>
             </div>
@@ -3925,7 +3925,7 @@ function openExecutivePdfModal(customData = null) {
     modal.classList.remove("hidden");
     if (window.lucide) lucide.createIcons();
 
-    showToast("เปิดเอกสารสรุปผลสำหรับผู้บริหารเรียบร้อยแล้ว 📄");
+    showToast("เปิดเอกสารสรุปผล (PDF) เรียบร้อยแล้ว 📄");
 
     // Automatically trigger PDF download after brief render settlement
     setTimeout(() => {
@@ -3985,7 +3985,7 @@ async function downloadExecutivePdfNow() {
 
             await window.html2pdf().set(opt).from(reportElem).save();
 
-            showToast("ดาวน์โหลดไฟล์ PDF เรียบร้อยแล้ว 📊 (พร้อมนำเสนอ)");
+            showToast("ดาวน์โหลดไฟล์ PDF เรียบร้อยแล้ว 📊");
         } catch (err) {
             console.error("Direct html2pdf error:", err);
             showToast("สคริปต์ดาวน์โหลดขัดข้อง กำลังเปิดหน้าต่างพิมพ์เป็น PDF แทน...", true);
