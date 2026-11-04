@@ -2470,6 +2470,8 @@ function switchAdminTab(tabName) {
         document.getElementById("tab-users-btn").classList.add("active");
         document.getElementById("admin-tab-users").classList.add("active");
         renderAffiliationRegistrationSummary();
+        renderAdminParticipantsTable();
+        renderAffiliationVideoStats();
     }
 }
 
@@ -2951,24 +2953,42 @@ function handleAdminUnitFilterChange() {
     }
     
     renderAffiliationVideoStats();
+    renderAdminParticipantsTable();
 }
 
 function handleAdminDivisionFilterChange() {
     renderAffiliationVideoStats();
+    renderAdminParticipantsTable();
 }
 
-function renderAdminParticipantsTable() {
-    const tbody = document.getElementById("admin-users-table-body");
-    tbody.innerHTML = "";
-    
-    // Read selected unit and division filters from dropdowns if present
+function handleAdminUserSearchChange() {
+    const searchInput = document.getElementById("admin-user-search-input");
+    const clearBtn = document.getElementById("admin-user-search-clear");
+    if (clearBtn) {
+        clearBtn.style.display = (searchInput && searchInput.value.trim()) ? "block" : "none";
+    }
+    renderAdminParticipantsTable();
+}
+
+function clearAdminUserSearch() {
+    const searchInput = document.getElementById("admin-user-search-input");
+    const clearBtn = document.getElementById("admin-user-search-clear");
+    if (searchInput) searchInput.value = "";
+    if (clearBtn) clearBtn.style.display = "none";
+    renderAdminParticipantsTable();
+}
+
+function getFilteredParticipantsList() {
     const statSelect = document.getElementById("admin-stat-unit-select");
     const divSelect = document.getElementById("admin-stat-division-select");
+    const searchInput = document.getElementById("admin-user-search-input");
+    
     const selectedUnit = statSelect ? statSelect.value : "ทั้งหมด";
     const selectedDivision = divSelect ? divSelect.value : "ทั้งหมด";
+    const searchQuery = (searchInput ? searchInput.value : "").trim().toLowerCase();
     
-    // Filter participants based on selected unit and division
-    const filteredParticipants = participants.filter(p => {
+    // Filter participants based on selected unit, division, and search query
+    const filteredParticipants = (participants || []).filter(p => {
         let matchDept = true;
         if (selectedUnit !== "ทั้งหมด") {
             if (selectedUnit === "อื่นๆ") {
@@ -2982,25 +3002,32 @@ function renderAdminParticipantsTable() {
         if (selectedDivision !== "ทั้งหมด") {
             if (selectedDivision === "อื่นๆ") {
                 const knownDivs = (selectedUnit && deptDivisions[selectedUnit]) ? Object.keys(deptDivisions[selectedUnit]) : [];
-                return p.division === "อื่นๆ" || (p.division && p.division.startsWith("อื่นๆ:")) || !knownDivs.includes(p.division);
+                const matchDiv = (p.division === "อื่นๆ" || (p.division && p.division.startsWith("อื่นๆ:")) || !knownDivs.includes(p.division));
+                if (!matchDiv) return false;
+            } else {
+                if (p.division !== selectedDivision) return false;
             }
-            return p.division === selectedDivision;
         }
+
+        if (searchQuery) {
+            const name = (p.name || "").toLowerCase();
+            const empId = (p.empId || "").toLowerCase();
+            const dept = (p.dept || "").toLowerCase();
+            const div = (p.division || "").toLowerCase();
+            const emptype = (p.emptype || "").toLowerCase();
+            if (!name.includes(searchQuery) && 
+                !empId.includes(searchQuery) && 
+                !dept.includes(searchQuery) && 
+                !div.includes(searchQuery) && 
+                !emptype.includes(searchQuery)) {
+                return false;
+            }
+        }
+
         return true;
     });
-    
-    if (filteredParticipants.length === 0) {
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="7" class="text-center" style="padding: 2rem; color: var(--text-secondary);">
-                    ไม่มีข้อมูลผู้ลงทะเบียนสำหรับสังกัดนี้
-                </td>
-            </tr>
-        `;
-        return;
-    }
-    
-    // Deduplicate filtered participants before sorting & rendering so duplicate records never display
+
+    // Deduplicate filtered participants before sorting so duplicate records never display
     const seenMap = new Map();
     filteredParticipants.forEach(p => {
         const cleanEmpId = (p.empId && p.empId !== "-") ? String(p.empId).trim().toUpperCase() : "";
@@ -3013,11 +3040,67 @@ function renderAdminParticipantsTable() {
             ex.watchedAt = { ...(p.watchedAt || {}), ...(ex.watchedAt || {}) };
         }
     });
+
     const uniqueParticipants = Array.from(seenMap.values());
-    const sortedParticipants = uniqueParticipants.sort((a,b) => b.regTime.localeCompare(a.regTime));
+    const sortedParticipants = uniqueParticipants.sort((a, b) => {
+        const timeA = a.regTime || "";
+        const timeB = b.regTime || "";
+        return timeB.localeCompare(timeA);
+    });
+
+    return {
+        list: sortedParticipants,
+        selectedUnit,
+        selectedDivision,
+        searchQuery,
+        totalCount: sortedParticipants.length
+    };
+}
+
+function renderAdminParticipantsTable() {
+    const tbody = document.getElementById("admin-users-table-body");
+    if (!tbody) return;
+    tbody.innerHTML = "";
     
-    sortedParticipants.forEach(user => {
+    const { list: sortedParticipants, selectedUnit, selectedDivision, searchQuery } = getFilteredParticipantsList();
+    
+    // Update count badge & filter indicator if present
+    const countBadge = document.getElementById("admin-participants-count-badge");
+    if (countBadge) {
+        countBadge.innerText = `${sortedParticipants.length.toLocaleString('en-US')} คน`;
+    }
+    const filterIndicator = document.getElementById("admin-filter-indicator");
+    if (filterIndicator) {
+        let filterParts = [];
+        if (selectedUnit !== "ทั้งหมด") filterParts.push(`ฝ่าย: <strong>${selectedUnit}</strong>`);
+        if (selectedDivision !== "ทั้งหมด") filterParts.push(`กอง: <strong>${selectedDivision}</strong>`);
+        if (searchQuery) filterParts.push(`ค้นหา: "<strong>${searchQuery}</strong>"`);
+        
+        if (filterParts.length === 0) {
+            filterIndicator.innerHTML = `แสดงทั้งหมด • รวม <strong>${sortedParticipants.length.toLocaleString('en-US')}</strong> คน`;
+        } else {
+            filterIndicator.innerHTML = `ตัวกรอง: ${filterParts.join(" • ")} • พบ <strong>${sortedParticipants.length.toLocaleString('en-US')}</strong> คน (จากทั้งหมด ${participants.length.toLocaleString('en-US')} คน)`;
+        }
+    }
+    
+    if (sortedParticipants.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="8" class="text-center" style="padding: 2.5rem 1rem; color: var(--text-secondary);">
+                    <i data-lucide="info" style="width: 24px; height: 24px; margin-bottom: 0.5rem; opacity: 0.6;"></i>
+                    <div>${searchQuery || selectedUnit !== "ทั้งหมด" || selectedDivision !== "ทั้งหมด" 
+                        ? 'ไม่พบข้อมูลผู้ลงทะเบียนตามเงื่อนไขตัวกรองหรือคำค้นหาที่ระบุ' 
+                        : 'ยังไม่มีข้อมูลผู้ลงทะเบียนในระบบ'}</div>
+                </td>
+            </tr>
+        `;
+        if (window.lucide) lucide.createIcons();
+        return;
+    }
+    
+    sortedParticipants.forEach((user, index) => {
         const userKey = (user.empId && user.empId !== "-") ? user.empId : user.name;
+        const safeUserKey = String(userKey).replace(/'/g, "\\'");
         const userWatched = (user && Array.isArray(user.watched) && user.watched.length > 0) ? user.watched : (watchedLogs[userKey] || []);
         const totalCount = videos.length;
         const watchedCount = userWatched.filter(id => videos.some(v => v.id === id)).length;
@@ -3027,6 +3110,7 @@ function renderAdminParticipantsTable() {
 
         const tr = document.createElement("tr");
         tr.innerHTML = `
+            <td style="text-align: center; color: var(--text-secondary); font-family: 'Outfit', sans-serif; font-size: 0.85rem;">${index + 1}</td>
             <td style="white-space: nowrap;"><span class="category-pill" style="background-color: #fff8e0; border-color: rgba(253,197,0,0.25); color: var(--yellow-d); white-space: nowrap;">${user.emptype || 'พนักงาน'}</span></td>
             <td style="font-family: 'Outfit', sans-serif; font-weight: 500; white-space: nowrap;">${user.empId || '-'}</td>
             <td style="white-space: nowrap;"><strong>${user.name}</strong></td>
@@ -3038,17 +3122,17 @@ function renderAdminParticipantsTable() {
             </td>
             <td style="font-family: 'Outfit', sans-serif; font-size: 0.85rem; color: var(--text-secondary); white-space: nowrap;">${user.regTime}</td>
             <td style="white-space: nowrap;">
-                <span class="watched-status-pill ${watchedCount === totalCount && totalCount > 0 ? 'watched' : ''}" style="cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem; white-space: nowrap;" onclick="showParticipantDetails('${userKey}')" title="คลิกดูและจัดการสถานะรายบุคคล">
+                <span class="watched-status-pill ${watchedCount === totalCount && totalCount > 0 ? 'watched' : ''}" style="cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem; white-space: nowrap;" onclick="showParticipantDetails('${safeUserKey}')" title="คลิกดูและจัดการสถานะรายบุคคล">
                     <i data-lucide="${watchedCount === totalCount && totalCount > 0 ? 'trophy' : 'eye'}"></i>
                     <span>ชมแล้ว ${watchedCount}/${totalCount} คลิป</span>
                 </span>
             </td>
             <td style="text-align: center; white-space: nowrap;">
                 <div class="button-group" style="justify-content: center; gap: 0.3rem; flex-wrap: nowrap; display: inline-flex;">
-                    <button class="btn btn-outline" style="padding: 0.25rem 0.45rem; font-size: 0.75rem; border-radius: 0.35rem;" onclick="openParticipantEditModal('${userKey}')" title="แก้ไขข้อมูล">
+                    <button class="btn btn-outline" style="padding: 0.25rem 0.45rem; font-size: 0.75rem; border-radius: 0.35rem;" onclick="openParticipantEditModal('${safeUserKey}')" title="แก้ไขข้อมูล">
                         <i data-lucide="edit-2" style="width: 12px; height: 12px;"></i>
                     </button>
-                    <button class="btn btn-danger-outline" style="padding: 0.25rem 0.45rem; font-size: 0.75rem; border-radius: 0.35rem;" onclick="deleteParticipant('${userKey}', '${blobUrl}')" title="ลบข้อมูล">
+                    <button class="btn btn-danger-outline" style="padding: 0.25rem 0.45rem; font-size: 0.75rem; border-radius: 0.35rem;" onclick="deleteParticipant('${safeUserKey}', '${blobUrl}')" title="ลบข้อมูล">
                         <i data-lucide="trash-2" style="width: 12px; height: 12px;"></i>
                     </button>
                 </div>
@@ -3057,7 +3141,7 @@ function renderAdminParticipantsTable() {
         tbody.appendChild(tr);
     });
     
-    lucide.createIcons();
+    if (window.lucide) lucide.createIcons();
 }
 
 function renderAffiliationVideoStats() {

@@ -28,8 +28,8 @@ export default async function handler(req, res) {
 
   const { emptype, empId, name, dept, division, regTime } = req.body ?? {};
 
-  if (!emptype || !name || !dept || !regTime) {
-    return res.status(400).json({ error: "ข้อมูลไม่ครบถ้วน" });
+  if (!emptype || !name || !dept || !division || !regTime) {
+    return res.status(400).json({ error: "ข้อมูลไม่ครบถ้วน (กรุณาระบุสังกัดฝ่ายและกอง)" });
   }
   
   if (emptype === "พนักงาน" && !empId) {
