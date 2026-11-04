@@ -4169,24 +4169,226 @@ function openPrintSummaryWindow(pdfHtml) {
     showToast("เปิดหน้าต่างพิมพ์รายงานสรุปยอด (สามารถเลือก Save as PDF ได้) 🖨️");
 }
 
-// --- Export Participants Data to CSV ---
-function exportParticipantsToCSV() {
-    if (participants.length === 0) {
-        showToast("ไม่มีข้อมูลผู้ลงทะเบียนสำหรับส่งออก", true);
+// --- Export Participants Data (Filter-Aware: Excel & CSV) ---
+function exportParticipantsReport(format = 'excel') {
+    const filterData = getFilteredParticipantsList();
+    if (!filterData.list || filterData.list.length === 0) {
+        showToast("ไม่มีข้อมูลผู้ลงทะเบียนตามเงื่อนไขที่เลือก ⚠️", true);
+        return;
+    }
+    if (format === 'csv') {
+        exportParticipantsToCSV(filterData);
+    } else {
+        exportParticipantsToExcel(filterData);
+    }
+}
+
+function exportParticipantsToExcel(filterData) {
+    if (!filterData) filterData = getFilteredParticipantsList();
+    const { list, selectedUnit, selectedDivision, searchQuery } = filterData;
+    
+    if (!list || list.length === 0) {
+        showToast("ไม่มีข้อมูลผู้ลงทะเบียนตามเงื่อนไขที่เลือก ⚠️", true);
+        return;
+    }
+    
+    const totalCountVideos = videos.length;
+    let completedCount = 0;
+    let inProgressCount = 0;
+    
+    list.forEach(user => {
+        const userKey = getUserKey(user);
+        const userWatched = (user && Array.isArray(user.watched) && user.watched.length > 0) ? user.watched : (watchedLogs[userKey] || []);
+        const watchedCount = userWatched.filter(id => videos.some(v => v.id === id)).length;
+        if (watchedCount === totalCountVideos && totalCountVideos > 0) {
+            completedCount++;
+        } else {
+            inProgressCount++;
+        }
+    });
+    
+    const compPctStr = list.length > 0 ? ((completedCount / list.length) * 100).toFixed(1) + "%" : "0%";
+    const currentDateThai = new Date().toLocaleDateString('th-TH', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric', 
+        hour: '2-digit', 
+        minute: '2-digit' 
+    });
+    
+    const colSpan = 9 + totalCountVideos;
+    
+    let filterDesc = `สังกัดฝ่าย: ${selectedUnit}  |  สังกัดกอง: ${selectedDivision}`;
+    if (searchQuery) {
+        filterDesc += `  |  คำค้นหา: "${searchQuery}"`;
+    }
+    filterDesc += `  |  จำนวนที่ตรงเงื่อนไข: ${list.length.toLocaleString('en-US')} คน (จากทั้งหมด ${participants.length.toLocaleString('en-US')} คน)`;
+
+    let html = `
+    <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+        <!--[if gte mso 9]>
+        <xml>
+            <x:ExcelWorkbook>
+                <x:ExcelWorksheets>
+                    <x:ExcelWorksheet>
+                        <x:Name>รายชื่อผู้เข้าชม</x:Name>
+                        <x:WorksheetOptions>
+                            <x:DisplayGridlines/>
+                        </x:WorksheetOptions>
+                    </x:ExcelWorksheet>
+                </x:ExcelWorksheets>
+            </x:ExcelWorkbook>
+        </xml>
+        <![endif]-->
+        <style>
+            table { border-collapse: collapse; width: 100%; font-family: Tahoma, 'Noto Sans Thai', 'Segoe UI', sans-serif; font-size: 10pt; }
+            th { background-color: #1b4c9e; color: #ffffff; border: 1px solid #94a3b8; padding: 10px 8px; text-align: center; font-weight: bold; font-size: 10.5pt; vertical-align: middle; }
+            td { border: 1px solid #cbd5e1; padding: 6px 8px; vertical-align: middle; font-size: 10pt; }
+            .row-even { background-color: #ffffff; }
+            .row-odd { background-color: #f8fafc; }
+            .text-center { text-align: center; }
+            .text-left { text-align: left; }
+            .text-right { text-align: right; }
+            .text-emp-id { text-align: center; mso-number-format: "\\@"; font-family: Tahoma, sans-serif; }
+            .text-date { text-align: center; font-family: Tahoma, sans-serif; font-size: 9.5pt; color: #475569; }
+            .status-completed { text-align: center; font-weight: bold; color: #059669; background-color: #ecfdf5; }
+            .status-progress { text-align: center; font-weight: bold; color: #d97706; background-color: #fffbeb; }
+            .badge-type { text-align: center; color: #92400e; background-color: #fff8e0; font-weight: 600; }
+            .watched-ok { text-align: center; color: #059669; font-size: 9.5pt; font-weight: 600; background-color: #f0fdf4; }
+            .watched-not { text-align: center; color: #94a3b8; font-size: 9pt; }
+            .title-header { font-size: 15pt; font-weight: bold; color: #1b4c9e; text-align: center; }
+            .subtitle-header { font-size: 10.5pt; color: #64748b; text-align: center; }
+            .filter-header { font-size: 10pt; color: #1e293b; background-color: #eff6ff; border: 1px solid #bfdbfe; padding: 8px 12px; }
+            .summary-footer-row { background-color: #0f2c59; color: #ffffff; font-weight: bold; }
+            .summary-footer-row td { border-color: #0f2c59; color: #ffffff; padding: 9px 8px; font-size: 10.5pt; }
+        </style>
+    </head>
+    <body>
+        <table>
+            <tr>
+                <td colspan="${colSpan}" class="title-header" style="border: none; padding-top: 10px; padding-bottom: 4px;">
+                    รายชื่อผู้ลงทะเบียนและประวัติการรับชมสื่ออนุรักษ์พลังงาน กฟผ. ไทรน้อย
+                </td>
+            </tr>
+            <tr>
+                <td colspan="${colSpan}" class="subtitle-header" style="border: none; padding-bottom: 6px;">
+                    EGAT Sainoi Smart Energy Video Hub • ข้อมูล ณ วันที่ ${currentDateThai} น.
+                </td>
+            </tr>
+            <tr>
+                <td colspan="${colSpan}" class="filter-header" style="border: 1px solid #bfdbfe;">
+                    📌 <strong>เงื่อนไขตัวกรอง:</strong> ${filterDesc}
+                </td>
+            </tr>
+            <tr>
+                <td colspan="${colSpan}" style="border: none; height: 8px;"></td>
+            </tr>
+            <thead>
+                <tr>
+                    <th style="width: 55px;">ลำดับ</th>
+                    <th style="width: 110px;">ประเภทบุคลากร</th>
+                    <th style="width: 110px;">รหัสพนักงาน</th>
+                    <th style="width: 220px;">ชื่อ - สกุล</th>
+                    <th style="width: 160px;">สังกัดฝ่าย</th>
+                    <th style="width: 180px;">สังกัดกอง</th>
+                    <th style="width: 160px;">วันเวลาลงทะเบียน</th>
+                    <th style="width: 110px;">ความคืบหน้า</th>
+                    <th style="width: 130px;">สถานะการรับชม</th>
+                    ${videos.map((v, idx) => `<th style="width: 200px;">คลิปที่ ${idx + 1}: ${v.title}</th>`).join('')}
+                </tr>
+            </thead>
+            <tbody>
+    `;
+    
+    list.forEach((user, index) => {
+        const userKey = getUserKey(user);
+        const userWatched = (user && Array.isArray(user.watched) && user.watched.length > 0) ? user.watched : (watchedLogs[userKey] || []);
+        const watchedCount = userWatched.filter(id => videos.some(v => v.id === id)).length;
+        const isCompleted = (watchedCount === totalCountVideos && totalCountVideos > 0);
+        const rowClass = (index % 2 === 0) ? 'row-even' : 'row-odd';
+        
+        html += `
+            <tr class="${rowClass}">
+                <td class="text-center">${index + 1}</td>
+                <td class="badge-type">${user.emptype || 'พนักงาน'}</td>
+                <td class="text-emp-id">${user.empId || '-'}</td>
+                <td class="text-left" style="font-weight: 600;">${user.name || '-'}</td>
+                <td class="text-left">${user.dept || '-'}</td>
+                <td class="text-left">${user.division || '-'}</td>
+                <td class="text-date">${user.regTime || '-'}</td>
+                <td class="text-center" style="font-weight: 600;">${watchedCount}/${totalCountVideos} คลิป</td>
+                <td class="${isCompleted ? 'status-completed' : 'status-progress'}">${isCompleted ? 'รับชมครบถ้วน' : 'กำลังรับชม'}</td>
+        `;
+        
+        videos.forEach(v => {
+            const isWatched = userWatched.includes(v.id);
+            if (isWatched) {
+                const watchedTime = (user.watchedAt && user.watchedAt[v.id]) 
+                    ? user.watchedAt[v.id] 
+                    : (user.regTime || "ชมแล้ว");
+                html += `<td class="watched-ok">✓ ${watchedTime}</td>`;
+            } else {
+                html += `<td class="watched-not">ยังไม่ชม</td>`;
+            }
+        });
+        
+        html += `</tr>`;
+    });
+    
+    html += `
+            <!-- Footer Summary Row -->
+            <tr class="summary-footer-row">
+                <td colspan="7" style="text-align: right; padding-right: 15px;">สรุปยอดรวมตามเงื่อนไขที่เลือก:</td>
+                <td class="text-center">${list.length.toLocaleString('en-US')} คน</td>
+                <td class="text-center" style="color: #34d399;">ชมครบ ${completedCount.toLocaleString('en-US')} คน (${compPctStr})</td>
+                <td colspan="${totalCountVideos}" class="text-center" style="color: #fbbf24;">กำลังรับชม ${inProgressCount.toLocaleString('en-US')} คน</td>
+            </tr>
+        </tbody>
+        </table>
+    </body>
+    </html>
+    `;
+    
+    const safeUnit = (selectedUnit !== "ทั้งหมด") ? selectedUnit.replace(/[\\/:*?"<>|]/g, '_') : "All";
+    const safeDiv = (selectedDivision !== "ทั้งหมด") ? "_" + selectedDivision.replace(/[\\/:*?"<>|]/g, '_') : "";
+    const dateStamp = new Date().toISOString().slice(0, 10);
+    const filename = `EnergySave_Participants_${safeUnit}${safeDiv}_${dateStamp}.xls`;
+
+    const blob = new Blob(["\uFEFF" + html], { type: "application/vnd.ms-excel;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", filename);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    showToast("ส่งออกรายชื่อผู้เข้าชม (Excel) เรียบร้อยแล้ว 📊");
+}
+
+function exportParticipantsToCSV(filterData) {
+    if (!filterData) filterData = getFilteredParticipantsList();
+    const { list, selectedUnit, selectedDivision, searchQuery } = filterData;
+    
+    if (!list || list.length === 0) {
+        showToast("ไม่มีข้อมูลผู้ลงทะเบียนตามเงื่อนไขที่เลือก ⚠️", true);
         return;
     }
     
     // Header Row in Thai
-    let headers = ["ประเภทบุคลากร", "รหัสพนักงาน", "ชื่อ - สกุล", "สังกัดฝ่าย", "สังกัดกอง", "วันเวลาลงทะเบียน", "จำนวนวิดีโอที่ดูเสร็จสิ้น", "สถานะการชมคลังสื่อทั้งหมด"];
+    let headers = ["ลำดับ", "ประเภทบุคลากร", "รหัสพนักงาน", "ชื่อ - สกุล", "สังกัดฝ่าย", "สังกัดกอง", "วันเวลาลงทะเบียน", "จำนวนวิดีโอที่ชม", "สถานะการรับชม"];
     
     // Append a header column for each video in the library
-    videos.forEach(v => {
-        headers.push(`การชม: ${v.title}`);
+    videos.forEach((v, idx) => {
+        headers.push(`คลิปที่ ${idx + 1}: ${v.title}`);
     });
     
-    let csvContent = headers.map(h => `"${h.replace(/"/g, '""')}"`).join(",") + "\n";
+    let csvContent = headers.map(h => `"${String(h).replace(/"/g, '""')}"`).join(",") + "\n";
     
-    participants.forEach(user => {
+    list.forEach((user, index) => {
         const userKey = getUserKey(user);
         const userWatched = (user && Array.isArray(user.watched) && user.watched.length > 0) ? user.watched : (watchedLogs[userKey] || []);
         const totalCount = videos.length;
@@ -4202,6 +4404,7 @@ function exportParticipantsToCSV() {
         const regTimeText = user.regTime || "-";
         
         const row = [
+            index + 1,
             typeText,
             empIdText,
             nameText,
@@ -4228,20 +4431,25 @@ function exportParticipantsToCSV() {
         csvContent += row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(",") + "\n";
     });
     
+    const safeUnit = (selectedUnit !== "ทั้งหมด") ? selectedUnit.replace(/[\\/:*?"<>|]/g, '_') : "All";
+    const safeDiv = (selectedDivision !== "ทั้งหมด") ? "_" + selectedDivision.replace(/[\\/:*?"<>|]/g, '_') : "";
+    const dateStamp = new Date().toISOString().slice(0, 10);
+    const filename = `EnergySave_Participants_${safeUnit}${safeDiv}_${dateStamp}.csv`;
+
     // Add UTF-8 BOM byte sequence (EF BB BF) so Microsoft Excel opens it with proper Thai characters encoding
     const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", `EnergySave_Participants_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.setAttribute("download", filename);
     link.style.visibility = 'hidden';
     
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     
-    showToast("ดาวน์โหลดไฟล์ CSV เรียบร้อยแล้ว 📊");
+    showToast("ส่งออกรายชื่อผู้เข้าชม (CSV) เรียบร้อยแล้ว 📊");
 }
 
 // --- Delete Single Participant ---

@@ -43,7 +43,7 @@
             document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"><\/script>');
         }
     </script>
-    <link rel="stylesheet" href="style.css?v=3.5">
+    <link rel="stylesheet" href="style.css?v=3.6">
 </head>
 <body>
     <!-- Background Decor Elements -->
@@ -422,8 +422,11 @@
                         <button class="btn btn-pdf" onclick="exportSummaryReport('pdf')">
                             <i data-lucide="file-down"></i> ส่งออกสรุปยอด (PDF)
                         </button>
-                        <button class="btn btn-outline" onclick="exportParticipantsToCSV()">
-                            <i data-lucide="download"></i> ส่งออกรายชื่อผู้เข้าชม (CSV)
+                        <button class="btn btn-emerald" onclick="exportParticipantsReport('excel')" title="ส่งออกรายชื่อผู้เข้าชมตามตัวกรองที่เลือกเป็น Excel">
+                            <i data-lucide="file-spreadsheet"></i> ส่งออกรายชื่อ (Excel)
+                        </button>
+                        <button class="btn btn-outline" onclick="exportParticipantsReport('csv')" title="ส่งออกรายชื่อผู้เข้าชมตามตัวกรองที่เลือกเป็น CSV">
+                            <i data-lucide="download"></i> ส่งออกรายชื่อ (CSV)
                         </button>
                         <button class="btn btn-danger-outline" onclick="clearAllParticipants()">
                             <i data-lucide="trash-2"></i> ล้างข้อมูลทั้งหมด
@@ -505,23 +508,53 @@
                     </div>
                 </div>
 
-                <div class="table-responsive">
-                    <table class="admin-table">
-                        <thead>
-                            <tr>
-                                <th>ประเภท</th>
-                                <th>รหัสพนักงาน</th>
-                                <th>ชื่อ - สกุล</th>
-                                <th>สังกัด (ฝ่าย/กอง)</th>
-                                <th>เวลาลงทะเบียน</th>
-                                <th>จำนวนวิดีโอที่ชม</th>
-                                <th style="text-align: center;">การจัดการ</th>
-                            </tr>
-                        </thead>
-                        <tbody id="admin-users-table-body">
-                            <!-- Dynamic Content -->
-                        </tbody>
-                    </table>
+                <!-- Participants List Card -->
+                <div class="card" style="margin-bottom: 1.5rem; background-color: #ffffff; border-color: rgba(27,76,158,0.15); padding: 1.25rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1rem;">
+                        <div>
+                            <h4 style="color: var(--blue-d); margin: 0; display: flex; align-items: center; gap: 0.4rem; font-size: 1.1rem;">
+                                <i data-lucide="users" style="width: 1.2rem; height: 1.2rem; color: var(--blue);"></i> 
+                                รายชื่อผู้ลงทะเบียนและประวัติการรับชมสื่อ
+                                <span id="admin-participants-count-badge" class="badge-subdept" style="background: #e0f2fe; color: #0284c7; font-weight: 700; font-size: 0.8rem; margin-left: 0.25rem;">0 คน</span>
+                            </h4>
+                            <div id="admin-filter-indicator" style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.2rem;">
+                                แสดงทั้งหมด • รวม 0 คน
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                            <div style="position: relative; min-width: 220px;">
+                                <i data-lucide="search" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; color: #94a3b8; pointer-events: none;"></i>
+                                <input type="text" id="admin-user-search-input" placeholder="ค้นหาชื่อ, รหัส, สังกัด..." oninput="handleAdminUserSearchChange()" style="padding: 0.4rem 1.8rem 0.4rem 2rem; font-size: 0.82rem; border: 1px solid #cbd5e1; border-radius: 6px; width: 100%; box-sizing: border-box; background: #ffffff;">
+                                <button type="button" id="admin-user-search-clear" onclick="clearAdminUserSearch()" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: #94a3b8; font-size: 12px; display: none; padding: 2px;" title="ล้างการค้นหา">✕</button>
+                            </div>
+                            <button class="btn btn-emerald" style="font-size: 0.8rem; padding: 0.4rem 0.75rem;" onclick="exportParticipantsReport('excel')" title="ส่งออกรายชื่อผู้เข้าชมตามตัวกรองปัจจุบันเป็น Excel">
+                                <i data-lucide="file-spreadsheet" style="width: 14px; height: 14px;"></i> ส่งออกรายชื่อ Excel
+                            </button>
+                            <button class="btn btn-outline" style="font-size: 0.8rem; padding: 0.4rem 0.75rem;" onclick="exportParticipantsReport('csv')" title="ส่งออกรายชื่อผู้เข้าชมตามตัวกรองปัจจุบันเป็น CSV">
+                                <i data-lucide="download" style="width: 14px; height: 14px;"></i> ส่งออกรายชื่อ CSV
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 50px; text-align: center;">ลำดับ</th>
+                                    <th>ประเภท</th>
+                                    <th>รหัสพนักงาน</th>
+                                    <th>ชื่อ - สกุล</th>
+                                    <th>สังกัด (ฝ่าย/กอง)</th>
+                                    <th>เวลาลงทะเบียน</th>
+                                    <th>สถานะการรับชม</th>
+                                    <th style="text-align: center;">การจัดการ</th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-users-table-body">
+                                <!-- Dynamic Content -->
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
@@ -952,6 +985,6 @@
             lucide.createIcons();
         });
     </script>
-    <script src="app.js?v=3.5"></script>
+    <script src="app.js?v=3.6"></script>
 </body>
 </html>
