@@ -4211,8 +4211,11 @@ function generateSummaryPdfHtml(data, options = {}) {
     return html;
 }
 
+let currentPdfOptions = {};
+
 // Open Executive PDF Preview & Export Modal
 function openExecutivePdfModal(customData = null, options = {}) {
+    currentPdfOptions = options || {};
     const summaryData = customData || getAffiliationSummaryData();
     const modal = document.getElementById("admin-pdf-modal");
     const contentArea = document.getElementById("pdf-report-content");
@@ -4230,7 +4233,6 @@ function openExecutivePdfModal(customData = null, options = {}) {
     if (window.lucide) lucide.createIcons();
 
     showToast("เปิดเอกสารสรุปผล (PDF) เรียบร้อยแล้ว 📄");
-
 }
 
 function closeAdminPdfModal() {
@@ -4238,21 +4240,31 @@ function closeAdminPdfModal() {
     if (modal) modal.classList.add("hidden");
 }
 
-async function downloadExecutivePdfNow() {
-    printExecutiveReportNow();
-}
-
-// Native vector print-to-PDF
-function printExecutiveReportNow() {
+function downloadExecutivePdfNow() {
     const modal = document.getElementById("admin-pdf-modal");
     if (modal && modal.classList.contains("hidden")) {
         modal.classList.remove("hidden");
     }
+    const origTitle = document.title;
+    const isDeptOnly = !!(currentPdfOptions && currentPdfOptions.deptOnly);
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const fileName = isDeptOnly ? `EPAGO_Summary_DeptOnly_${dateStr}` : `EPAGO_Summary_Report_${dateStr}`;
     
+    document.title = fileName;
+    showToast("กำลังเปิดหน้าต่างดาวน์โหลด PDF (เลือก 'Save as PDF' เพื่อบันทึกไฟล์คุณภาพสูง)... 📄");
+
     // Slight timeout to let layout settle before print trigger
     setTimeout(() => {
         window.print();
+        setTimeout(() => {
+            document.title = origTitle;
+        }, 1500);
     }, 150);
+}
+
+// Native vector print-to-PDF
+function printExecutiveReportNow() {
+    downloadExecutivePdfNow();
 }
 
 function openPrintSummaryWindow(pdfHtml) {
@@ -4298,7 +4310,7 @@ function openPrintSummaryWindow(pdfHtml) {
                         🖨️ หน้าต่างพิมพ์เอกสาร: เลือกปลายทางเป็น <b>"บันทึกเป็น PDF" (Save as PDF)</b> เพื่อดาวน์โหลดไฟล์
                     </span>
                     <button onclick="window.print()" style="padding: 6px 14px; background: #1b4c9e; color: white; border: none; border-radius: 6px; font-weight: 700; cursor: pointer;">
-                        พิมพ์ / บันทึก PDF
+                        ดาวน์โหลด / บันทึก PDF
                     </button>
                 </div>
                 ${pdfHtml}

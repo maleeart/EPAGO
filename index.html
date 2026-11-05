@@ -959,12 +959,12 @@
                         <i data-lucide="file-text" style="color: #1b4c9e; width: 22px; height: 22px;"></i> รายงานสรุปผลภาพรวม (PDF Report)
                     </h3>
                     <p style="margin: 0.2rem 0 0 0; font-size: 0.82rem; color: var(--text-secondary);">
-                        เอกสารสรุปความก้าวหน้า • พิมพ์หรือบันทึกเป็น PDF คุณภาพสูง (คมชัด หัวข้อครบถ้วน ไม่ตกหล่น)
+                        เอกสารสรุปความก้าวหน้า • คลิกดาวน์โหลดไฟล์ PDF คุณภาพสูง (คมชัด หัวข้อครบถ้วน ไม่ตกหล่น)
                     </p>
                 </div>
                 <div style="display: flex; gap: 0.45rem; align-items: center; flex-wrap: wrap;">
-                    <button class="btn btn-primary" style="font-size: 0.88rem; padding: 0.5rem 1.1rem; font-weight: 700; display: flex; align-items: center; gap: 0.45rem;" onclick="printExecutiveReportNow()">
-                        <i data-lucide="printer" style="width: 16px; height: 16px;"></i> พิมพ์ / บันทึกเป็น PDF (คุณภาพสูง)
+                    <button id="pdf-download-btn" class="btn btn-primary" style="font-size: 0.88rem; padding: 0.5rem 1.1rem; font-weight: 700; display: flex; align-items: center; gap: 0.45rem;" onclick="downloadExecutivePdfNow()">
+                        <i data-lucide="download" style="width: 16px; height: 16px;"></i> ดาวน์โหลดไฟล์ PDF (คุณภาพสูง)
                     </button>
                     <button class="modal-close" style="position: static; margin-left: 0.25rem;" onclick="closeAdminPdfModal()" title="ปิดหน้าต่าง">
                         <i data-lucide="x"></i>
