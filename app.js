@@ -3552,7 +3552,7 @@ function exportDeptOnlySummary(format = 'excel') {
 
 function exportDeptOnlyToExcel(data) {
     const { stats, grandTarget, grandCompleted, grandRemaining, grandCompPctStr } = data;
-    const deptList = Object.keys(divisionsConfig);
+    const deptList = Object.keys(deptDivisions);
 
     let html = `
     <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
@@ -3614,7 +3614,7 @@ function exportDeptOnlyToExcel(data) {
 
     deptList.forEach((u, i) => {
         const d = stats[u] || { total: 0, completed: 0, inProgress: 0 };
-        const target = (headcountConfig[u] !== undefined) ? parseInt(headcountConfig[u], 10) : 0;
+        const target = (deptHeadcounts[u] !== undefined) ? parseInt(deptHeadcounts[u], 10) : (DEFAULT_HEADCOUNT[u] || 0);
         const rawCompCount = d.completed;
         const compCount = target > 0 ? Math.min(rawCompCount, target) : rawCompCount;
         const remainingCount = target > 0 ? Math.max(0, target - rawCompCount) : 0;
@@ -3926,11 +3926,11 @@ function generateSummaryPdfHtml(data, options = {}) {
     const grandKpiColor = grandCompPctVal >= 80 ? "#059669" : grandCompPctVal >= 50 ? "#d97706" : "#dc2626";
 
     if (options && options.deptOnly) {
-        const deptList = Object.keys(divisionsConfig);
+        const deptList = Object.keys(deptDivisions);
         let deptRowsHtml = '';
         deptList.forEach((u, i) => {
             const d = stats[u] || { total: 0, completed: 0, inProgress: 0 };
-            const target = (headcountConfig[u] !== undefined) ? parseInt(headcountConfig[u], 10) : 0;
+            const target = (deptHeadcounts[u] !== undefined) ? parseInt(deptHeadcounts[u], 10) : (DEFAULT_HEADCOUNT[u] || 0);
             const rawCompCount = d.completed;
             const compCount = target > 0 ? Math.min(rawCompCount, target) : rawCompCount;
             const remainingCount = target > 0 ? Math.max(0, target - rawCompCount) : 0;
@@ -4231,10 +4231,6 @@ function openExecutivePdfModal(customData = null, options = {}) {
 
     showToast("เปิดเอกสารสรุปผล (PDF) เรียบร้อยแล้ว 📄");
 
-    // Automatically trigger PDF download after brief render settlement
-    setTimeout(() => {
-        downloadExecutivePdfNow();
-    }, 450);
 }
 
 function closeAdminPdfModal() {
@@ -4243,75 +4239,7 @@ function closeAdminPdfModal() {
 }
 
 async function downloadExecutivePdfNow() {
-    const reportElem = document.getElementById("pdf-report-content");
-    if (!reportElem) {
-        showToast("ไม่พบเนื้อหารายงานสำหรับดาวน์โหลด", true);
-        return;
-    }
-
-    const downloadBtn = document.getElementById("pdf-download-btn");
-    const originalBtnText = downloadBtn ? downloadBtn.innerHTML : "";
-    if (downloadBtn) {
-        downloadBtn.disabled = true;
-        downloadBtn.innerHTML = `<i data-lucide="loader" class="spin" style="width:15px;height:15px;"></i> กำลังบันทึก PDF...`;
-        if (window.lucide) lucide.createIcons();
-    }
-
-    showToast("กำลังประมวลผลไฟล์ PDF สรุปยอด... 📄");
-
-    await ensureHtml2PdfLoaded();
-
-    if (typeof window.html2pdf !== "undefined") {
-        try {
-            // Scroll preview to top before capturing to ensure 100% full capture
-            const scrollWrapper = document.getElementById("pdf-preview-scroll-wrapper");
-            if (scrollWrapper) scrollWrapper.scrollTop = 0;
-
-            const fileName = `EnergySave_Summary_Report_${new Date().toISOString().slice(0, 10)}.pdf`;
-            const opt = {
-                margin: [10, 8, 10, 8],
-                filename: fileName,
-                image: { type: "jpeg", quality: 0.98 },
-                html2canvas: {
-                    scale: 2,
-                    useCORS: true,
-                    logging: false,
-                    scrollY: 0,
-                    scrollX: 0
-                },
-                jsPDF: {
-                    unit: "mm",
-                    format: "a4",
-                    orientation: "portrait"
-                },
-                pagebreak: { mode: ["css", "legacy"] }
-            };
-
-            await window.html2pdf().set(opt).from(reportElem).save();
-
-            showToast("ดาวน์โหลดไฟล์ PDF เรียบร้อยแล้ว 📊");
-        } catch (err) {
-            console.error("Direct html2pdf error:", err);
-            showToast("สคริปต์ดาวน์โหลดขัดข้อง กำลังเปิดหน้าต่างพิมพ์เป็น PDF แทน...", true);
-            setTimeout(() => {
-                printExecutiveReportNow();
-            }, 600);
-        } finally {
-            if (downloadBtn) {
-                downloadBtn.disabled = false;
-                downloadBtn.innerHTML = originalBtnText;
-                if (window.lucide) lucide.createIcons();
-            }
-        }
-    } else {
-        showToast("เปิดหน้าต่างพิมพ์รายงาน (เลือก Save as PDF ได้ทันที) 🖨️");
-        printExecutiveReportNow();
-        if (downloadBtn) {
-            downloadBtn.disabled = false;
-            downloadBtn.innerHTML = originalBtnText;
-            if (window.lucide) lucide.createIcons();
-        }
-    }
+    printExecutiveReportNow();
 }
 
 // Native vector print-to-PDF

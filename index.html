@@ -956,20 +956,17 @@
             <div id="admin-pdf-modal-header-bar" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px solid var(--border-color); padding-bottom: 0.85rem; margin-bottom: 0.85rem; flex-wrap: wrap; gap: 0.5rem;">
                 <div>
                     <h3 style="margin: 0; color: var(--blue-d); font-size: 1.15rem; display: flex; align-items: center; gap: 0.45rem;">
-                        <i data-lucide="file-text" style="color: #e11d48; width: 22px; height: 22px;"></i> รายงานสรุปผลภาพรวม (PDF Report)
+                        <i data-lucide="file-text" style="color: #1b4c9e; width: 22px; height: 22px;"></i> รายงานสรุปผลภาพรวม (PDF Report)
                     </h3>
                     <p style="margin: 0.2rem 0 0 0; font-size: 0.82rem; color: var(--text-secondary);">
-                        เอกสารสรุปความก้าวหน้ารายฝ่าย/กอง • ดาวน์โหลดไฟล์ .pdf หรือพิมพ์/บันทึก PDF คุณภาพสูงได้ทันที
+                        เอกสารสรุปความก้าวหน้า • พิมพ์หรือบันทึกเป็น PDF คุณภาพสูง (คมชัด หัวข้อครบถ้วน ไม่ตกหล่น)
                     </p>
                 </div>
                 <div style="display: flex; gap: 0.45rem; align-items: center; flex-wrap: wrap;">
-                    <button id="pdf-download-btn" class="btn btn-pdf" style="font-size: 0.85rem; padding: 0.45rem 0.95rem;" onclick="downloadExecutivePdfNow()">
-                        <i data-lucide="download" style="width: 15px; height: 15px;"></i> ดาวน์โหลดไฟล์ PDF (.pdf)
+                    <button class="btn btn-primary" style="font-size: 0.88rem; padding: 0.5rem 1.1rem; font-weight: 700; display: flex; align-items: center; gap: 0.45rem;" onclick="printExecutiveReportNow()">
+                        <i data-lucide="printer" style="width: 16px; height: 16px;"></i> พิมพ์ / บันทึกเป็น PDF (คุณภาพสูง)
                     </button>
-                    <button class="btn btn-primary" style="font-size: 0.85rem; padding: 0.45rem 0.95rem;" onclick="printExecutiveReportNow()">
-                        <i data-lucide="printer" style="width: 15px; height: 15px;"></i> พิมพ์ / บันทึกเป็น PDF (คมชัดสูง)
-                    </button>
-                    <button class="modal-close" style="position: static; margin-left: 0.25rem;" onclick="closeAdminPdfModal()">
+                    <button class="modal-close" style="position: static; margin-left: 0.25rem;" onclick="closeAdminPdfModal()" title="ปิดหน้าต่าง">
                         <i data-lucide="x"></i>
                     </button>
                 </div>
