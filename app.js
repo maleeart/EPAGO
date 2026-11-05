@@ -3541,6 +3541,119 @@ function exportSummaryReport(format = 'excel') {
     }
 }
 
+function exportDeptOnlySummary(format = 'excel') {
+    const summaryData = getAffiliationSummaryData();
+    if (format === 'pdf') {
+        openExecutivePdfModal(summaryData, { deptOnly: true });
+    } else {
+        exportDeptOnlyToExcel(summaryData);
+    }
+}
+
+function exportDeptOnlyToExcel(data) {
+    const { stats, grandTarget, grandCompleted, grandRemaining, grandCompPctStr } = data;
+    const deptList = Object.keys(divisionsConfig);
+
+    let html = `
+    <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+        <!--[if gte mso 9]>
+        <xml>
+            <x:ExcelWorkbook>
+                <x:ExcelWorksheets>
+                    <x:ExcelWorksheet>
+                        <x:Name>สรุปภาพรวมรายฝ่าย</x:Name>
+                        <x:WorksheetOptions>
+                            <x:DisplayGridlines/>
+                        </x:WorksheetOptions>
+                    </x:ExcelWorksheet>
+                </x:ExcelWorksheets>
+            </x:ExcelWorkbook>
+        </xml>
+        <![endif]-->
+        <style>
+            table { border-collapse: collapse; width: 100%; font-family: Tahoma, 'Noto Sans Thai', 'Segoe UI', sans-serif; font-size: 11pt; }
+            th { background-color: #1b4c9e; color: #ffffff; border: 1px solid #94a3b8; padding: 10px 8px; text-align: center; font-weight: bold; }
+            td { border: 1px solid #cbd5e1; padding: 7px 9px; vertical-align: middle; }
+            .grand-total-row { background-color: #0f2c59; color: #ffffff; font-weight: bold; font-size: 11.5pt; }
+            .grand-total-row td { border-color: #0f2c59; color: #ffffff; }
+            .num-center { text-align: center; mso-number-format: "\\#\\,\\#\\#0"; }
+            .pct-center { text-align: center; font-weight: bold; }
+            .title-header { font-size: 15pt; font-weight: bold; color: #1b4c9e; text-align: center; }
+            .subtitle-header { font-size: 10pt; color: #64748b; text-align: center; }
+        </style>
+    </head>
+    <body>
+        <table>
+            <tr>
+                <td colspan="5" class="title-header" style="height: 40px; vertical-align: middle;">รายงานสรุปผลการเข้าร่วมกิจกรรมและประเมินการรับชมสื่ออนุรักษ์พลังงาน (สรุปภาพรวมรายฝ่าย)</td>
+            </tr>
+            <tr>
+                <td colspan="5" class="subtitle-header" style="height: 25px; vertical-align: middle;">ข้อมูล ณ วันที่: ${new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })} น.</td>
+            </tr>
+            <tr><td colspan="5" style="height: 10px; border: none;"></td></tr>
+            <thead>
+                <tr>
+                    <th style="width: 250px;">สังกัดฝ่าย</th>
+                    <th style="width: 140px;">เป้าหมาย (คน)</th>
+                    <th style="width: 150px;">ประเมินแล้ว (คน)</th>
+                    <th style="width: 180px;">ยังไม่ทำ/คงเหลือ (คน)</th>
+                    <th style="width: 130px;">% ประเมินแล้ว</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr class="grand-total-row">
+                    <td style="text-align: center; padding: 10px 8px; font-weight: bold;">ภาพรวมทั้งหมด (รวมทุกฝ่าย)</td>
+                    <td class="num-center" style="font-weight: bold;">${grandTarget}</td>
+                    <td class="num-center" style="color: #34d399; font-weight: bold;">${grandCompleted}</td>
+                    <td class="num-center" style="color: #fbbf24; font-weight: bold;">${grandRemaining}</td>
+                    <td class="pct-center" style="color: #34d399; font-weight: bold;">${grandCompPctStr}</td>
+                </tr>
+    `;
+
+    deptList.forEach((u, i) => {
+        const d = stats[u] || { total: 0, completed: 0, inProgress: 0 };
+        const target = (headcountConfig[u] !== undefined) ? parseInt(headcountConfig[u], 10) : 0;
+        const rawCompCount = d.completed;
+        const compCount = target > 0 ? Math.min(rawCompCount, target) : rawCompCount;
+        const remainingCount = target > 0 ? Math.max(0, target - rawCompCount) : 0;
+        const compPctVal = target > 0 ? Math.min(100, (rawCompCount / target) * 100) : 0;
+        const compPctStr = target > 0 ? compPctVal.toFixed(1) + "%" : "—";
+        const compColor = target > 0 ? (compPctVal >= 80 ? "#059669" : compPctVal >= 50 ? "#d97706" : "#dc2626") : "#64748b";
+        const bg = i % 2 === 0 ? "#ffffff" : "#f8fafc";
+
+        html += `
+            <tr style="background-color: ${bg}; font-weight: bold;">
+                <td style="padding: 8px 12px; color: #0f2c59;">${u}</td>
+                <td class="num-center">${target > 0 ? target : '—'}</td>
+                <td class="num-center" style="color: #059669;">${compCount}</td>
+                <td class="num-center" style="color: #d97706;">${target > 0 ? remainingCount : '—'}</td>
+                <td class="pct-center" style="color: ${compColor};">${compPctStr}</td>
+            </tr>
+        `;
+    });
+
+    html += `
+            </tbody>
+        </table>
+    </body>
+    </html>
+    `;
+
+    const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const stamp = new Date().toISOString().slice(0, 10);
+    link.href = url;
+    link.download = `EPAGO_Dept_Summary_${stamp}.xls`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    showToast("ส่งออกไฟล์สรุปภาพรวมรายฝ่าย (Excel) สำเร็จแล้ว 📊");
+}
+
 function exportSummaryToPDF(data) {
     openExecutivePdfModal(data);
 }
@@ -3799,7 +3912,7 @@ function ensureHtml2PdfLoaded() {
     });
 }
 
-function generateSummaryPdfHtml(data) {
+function generateSummaryPdfHtml(data, options = {}) {
     const { stats, grandTarget, grandCompleted, grandRemaining, grandCompPctStr } = data;
     const grandCompPctVal = grandTarget > 0 ? (grandCompleted / grandTarget) * 100 : 0;
     const currentDateThai = new Date().toLocaleDateString('th-TH', { 
@@ -3811,6 +3924,113 @@ function generateSummaryPdfHtml(data) {
     });
 
     const grandKpiColor = grandCompPctVal >= 80 ? "#059669" : grandCompPctVal >= 50 ? "#d97706" : "#dc2626";
+
+    if (options && options.deptOnly) {
+        const deptList = Object.keys(divisionsConfig);
+        let deptRowsHtml = '';
+        deptList.forEach((u, i) => {
+            const d = stats[u] || { total: 0, completed: 0, inProgress: 0 };
+            const target = (headcountConfig[u] !== undefined) ? parseInt(headcountConfig[u], 10) : 0;
+            const rawCompCount = d.completed;
+            const compCount = target > 0 ? Math.min(rawCompCount, target) : rawCompCount;
+            const remainingCount = target > 0 ? Math.max(0, target - rawCompCount) : 0;
+            const compPctVal = target > 0 ? Math.min(100, (rawCompCount / target) * 100) : 0;
+            const compPctStr = target > 0 ? compPctVal.toFixed(1) + "%" : "—";
+            const compColor = target > 0 ? (compPctVal >= 80 ? "#059669" : compPctVal >= 50 ? "#d97706" : "#dc2626") : "#64748b";
+            const bg = i % 2 === 0 ? "#ffffff" : "#f8fafc";
+            deptRowsHtml += `
+                <tr style="background-color: ${bg}; font-weight: 700;">
+                    <td style="border: 1px solid #cbd5e1; padding: 7px 10px; text-align: left; color: #0f2c59;">${u}</td>
+                    <td style="border: 1px solid #cbd5e1; padding: 7px 6px; text-align: center;">${target > 0 ? target.toLocaleString('en-US') : '—'}</td>
+                    <td style="border: 1px solid #cbd5e1; padding: 7px 6px; text-align: center; color: #059669;">${compCount.toLocaleString('en-US')}</td>
+                    <td style="border: 1px solid #cbd5e1; padding: 7px 6px; text-align: center; color: #d97706;">${target > 0 ? remainingCount.toLocaleString('en-US') : '—'}</td>
+                    <td style="border: 1px solid #cbd5e1; padding: 7px 6px; text-align: center; color: ${compColor};">${compPctStr}</td>
+                </tr>
+            `;
+        });
+
+        return `
+        <div style="font-family: 'Noto Sans Thai', 'Sarabun', Tahoma, 'Segoe UI', sans-serif; color: #1e293b; background: #ffffff; padding: 14px 16px; width: 750px; box-sizing: border-box; line-height: 1.35;">
+            <!-- Header -->
+            <div style="border-bottom: 2.5px solid #1b4c9e; padding-bottom: 10px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: flex-start;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="width: 44px; height: 44px; border-radius: 10px; background: linear-gradient(135deg, #1b4c9e 0%, #0f2c59 100%); display: flex; align-items: center; justify-content: center; color: #ffffff; font-weight: 800; font-size: 20px; box-shadow: 0 3px 8px rgba(27,76,158,0.25);">
+                        ⚡
+                    </div>
+                    <div>
+                        <div style="font-size: 11px; font-weight: 700; color: #1b4c9e; letter-spacing: 0.5px; text-transform: uppercase;">
+                            การไฟฟ้าฝ่ายผลิตแห่งประเทศไทย (กฟผ.) ไทรน้อย
+                        </div>
+                        <div style="font-size: 15px; font-weight: 800; color: #0f2c59; line-height: 1.25; margin-top: 1px;">
+                            รายงานสรุปผลการเข้าร่วมกิจกรรมและประเมินการรับชมสื่ออนุรักษ์พลังงาน (สรุปภาพรวมรายฝ่าย)
+                        </div>
+                        <div style="font-size: 10px; color: #64748b; margin-top: 2px;">
+                            EGAT Sainoi Smart Energy Video Hub
+                        </div>
+                    </div>
+                </div>
+                <div style="text-align: right; min-width: 170px;">
+                    <div style="font-size: 9.5px; color: #64748b;">ข้อมูล ณ วันที่</div>
+                    <div style="font-size: 10.5px; font-weight: 700; color: #1b4c9e;">${currentDateThai} น.</div>
+                    <div style="margin-top: 4px; display: inline-block; font-size: 9px; padding: 2px 7px; border-radius: 10px; background: #ecfdf5; color: #059669; font-weight: 700; border: 1px solid #a7f3d0;">
+                        สรุปภาพรวมรายฝ่าย (5 คอลัมน์)
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mini Executive KPI Summary Cards -->
+            <div style="display: flex; gap: 8px; margin-bottom: 12px; width: 100%;">
+                <div style="flex: 1; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 7px 8px; text-align: center;">
+                    <div style="font-size: 9.5px; color: #64748b; font-weight: 600;">เป้าหมายรวมทั้งหมด</div>
+                    <div style="font-size: 15px; font-weight: 800; color: #1b4c9e; font-family: Tahoma, sans-serif; margin-top: 1px;">
+                        ${grandTarget.toLocaleString('en-US')} <span style="font-size: 9.5px; font-weight: normal; color: #64748b;">คน</span>
+                    </div>
+                </div>
+                <div style="flex: 1; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 6px; padding: 7px 8px; text-align: center;">
+                    <div style="font-size: 9.5px; color: #059669; font-weight: 600;">ประเมินแล้วทั้งหมด</div>
+                    <div style="font-size: 15px; font-weight: 800; color: #059669; font-family: Tahoma, sans-serif; margin-top: 1px;">
+                        ${grandCompleted.toLocaleString('en-US')} <span style="font-size: 9.5px; font-weight: normal; color: #059669;">คน</span>
+                    </div>
+                </div>
+                <div style="flex: 1; background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 7px 8px; text-align: center;">
+                    <div style="font-size: 9.5px; color: #d97706; font-weight: 600;">ยังไม่ทำ / คงเหลือ</div>
+                    <div style="font-size: 15px; font-weight: 800; color: #d97706; font-family: Tahoma, sans-serif; margin-top: 1px;">
+                        ${grandRemaining.toLocaleString('en-US')} <span style="font-size: 9.5px; font-weight: normal; color: #d97706;">คน</span>
+                    </div>
+                </div>
+                <div style="flex: 1; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 7px 8px; text-align: center;">
+                    <div style="font-size: 9.5px; color: #1d4ed8; font-weight: 600;">อัตราความสำเร็จภาพรวม</div>
+                    <div style="font-size: 15px; font-weight: 800; color: ${grandKpiColor}; font-family: Tahoma, sans-serif; margin-top: 1px;">
+                        ${grandCompPctStr}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Table Section -->
+            <table style="width: 100%; border-collapse: collapse; font-size: 9pt; line-height: 1.35;">
+                <thead>
+                    <tr style="background-color: #1b4c9e; color: #ffffff;">
+                        <th style="border: 1px solid #475569; padding: 6px 5px; width: 220px; text-align: center; font-weight: 700;">สังกัดฝ่าย</th>
+                        <th style="border: 1px solid #475569; padding: 6px 5px; width: 120px; text-align: center; font-weight: 700;">เป้าหมาย (คน)</th>
+                        <th style="border: 1px solid #475569; padding: 6px 5px; width: 130px; text-align: center; font-weight: 700;">ประเมินแล้ว (คน)</th>
+                        <th style="border: 1px solid #475569; padding: 6px 5px; width: 140px; text-align: center; font-weight: 700;">ยังไม่ทำ/คงเหลือ (คน)</th>
+                        <th style="border: 1px solid #475569; padding: 6px 5px; width: 110px; text-align: center; font-weight: 700;">% ประเมินแล้ว</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr style="background-color: #0f2c59; color: #ffffff; font-weight: 700; font-size: 9.5pt;">
+                        <td style="border: 1px solid #0f2c59; padding: 7px 6px; text-align: center; color: #ffffff;">ภาพรวมทั้งหมด (รวมทุกฝ่าย)</td>
+                        <td style="border: 1px solid #0f2c59; padding: 7px 6px; text-align: center; color: #ffffff;">${grandTarget.toLocaleString('en-US')}</td>
+                        <td style="border: 1px solid #0f2c59; padding: 7px 6px; text-align: center; color: #34d399;">${grandCompleted.toLocaleString('en-US')}</td>
+                        <td style="border: 1px solid #0f2c59; padding: 7px 6px; text-align: center; color: #fbbf24;">${grandRemaining.toLocaleString('en-US')}</td>
+                        <td style="border: 1px solid #0f2c59; padding: 7px 6px; text-align: center; color: #34d399;">${grandCompPctStr}</td>
+                    </tr>
+                    ${deptRowsHtml}
+                </tbody>
+            </table>
+        </div>
+        `;
+    }
 
     let html = `
     <div style="font-family: 'Noto Sans Thai', 'Sarabun', Tahoma, 'Segoe UI', sans-serif; color: #1e293b; background: #ffffff; padding: 14px 16px; width: 750px; box-sizing: border-box; line-height: 1.35;">
@@ -3992,20 +4212,20 @@ function generateSummaryPdfHtml(data) {
 }
 
 // Open Executive PDF Preview & Export Modal
-function openExecutivePdfModal(customData = null) {
+function openExecutivePdfModal(customData = null, options = {}) {
     const summaryData = customData || getAffiliationSummaryData();
     const modal = document.getElementById("admin-pdf-modal");
     const contentArea = document.getElementById("pdf-report-content");
     
     if (!modal || !contentArea) {
         // Fallback directly to print if modal elements are missing
-        const html = generateSummaryPdfHtml(summaryData);
+        const html = generateSummaryPdfHtml(summaryData, options);
         openPrintSummaryWindow(html);
         return;
     }
 
     // Render report HTML inside the visible preview container
-    contentArea.innerHTML = generateSummaryPdfHtml(summaryData);
+    contentArea.innerHTML = generateSummaryPdfHtml(summaryData, options);
     modal.classList.remove("hidden");
     if (window.lucide) lucide.createIcons();
 

@@ -1,26 +1,19 @@
-import { put, list, del } from "@vercel/blob";
+import { Redis } from "@upstash/redis";
 
 const PREFIX = "epago/participants/";
+const PARTICIPANTS_KEY = "epago:participants";
+const VIDEOS_BLOB_PATH = "epago/videos.json";
+const VIDEOS_KEY = "epago:videos";
+const HEADCOUNT_BLOB_PATH = "epago/headcount.json";
+const HEADCOUNT_KEY = "epago:headcount";
 
-export async function readParticipant(key) {
-  checkToken();
-  try {
-    const { blobs } = await list({ prefix: `${PREFIX}${key}.json` });
-    const b = blobs && blobs.find(item => item.pathname === `${PREFIX}${key}.json`) || (blobs && blobs[0]);
-    if (b) {
-      const data = await fetch(`${b.url}?t=${Date.now()}`, {
-        cache: "no-store",
-        headers: { "Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache" }
-      }).then(r => r.json());
-      return { ...data, _blobUrl: b.url };
-    }
-  } catch (e) {
-    console.error("Failed to read participant via list:", e);
-  }
-  return null;
-}
+const getRedis = () => {
+  const url = process.env.UPSTASH_REDIS_REST_URL ?? process.env.KV_REST_API_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN ?? process.env.KV_REST_API_TOKEN;
+  if (!url || !token) return null;
+  return new Redis({ url, token });
+};
 
-// Helper to normalize contractor names to strip spaces and symbols for clean blob filenames
 export const normalizeName = name => {
   if (!name) return "";
   return String(name).trim()
@@ -46,8 +39,31 @@ export function getBlobKey(user) {
   }
 }
 
+export async function readParticipant(key) {
+  const r = getRedis();
+  if (r) {
+    const data = await r.hget(PARTICIPANTS_KEY, key);
+    if (!data) return null;
+    const parsed = typeof data === "string" ? JSON.parse(data) : data;
+    return { ...parsed, _blobUrl: key };
+  }
+
+  // Fallback to Blob
+  try {
+    const { list } = await import("@vercel/blob");
+    const { blobs } = await list({ prefix: `${PREFIX}${key}.json` });
+    const b = blobs && blobs.find(item => item.pathname === `${PREFIX}${key}.json`) || (blobs && blobs[0]);
+    if (b) {
+      const data = await fetch(`${b.url}?t=${Date.now()}`).then(res => res.json());
+      return { ...data, _blobUrl: b.url };
+    }
+  } catch (e) {
+    console.error("Failed to read participant via list:", e);
+  }
+  return null;
+}
+
 export async function findParticipant({ emptype, name, empId }) {
-  checkToken();
   const cleanEmpId = empId && empId !== "-" ? String(empId).trim().toUpperCase() : "";
   const cleanName = normalizeName(name);
 
@@ -68,13 +84,14 @@ export async function findParticipant({ emptype, name, empId }) {
     const user = await readParticipant(`emp-${cleanEmpId.replace(/[^\w\u0e00-\u0e7f]/g, "_")}`);
     if (user) return user;
   }
+
   // 3. Try contractor key if name is given
   if (cleanName) {
     const user = await readParticipant(`contractor-${safeStr(cleanName)}`);
     if (user) return user;
   }
 
-  // 4. Fallback: scan all participants to guarantee matching
+  // 4. Fallback: scan all participants
   try {
     const all = await readAllParticipants();
     return all.find(p => {
@@ -90,180 +107,167 @@ export async function findParticipant({ emptype, name, empId }) {
   }
 }
 
-function checkToken() {
-  if (!process.env.BLOB_READ_WRITE_TOKEN && !process.env.VERCEL_OIDC_TOKEN && !process.env.BLOB_STORE_ID) {
-    throw new Error("ฐานข้อมูลคลาวด์ขัดข้อง: ไม่พบตัวแปรการเชื่อมต่อ Vercel Blob (BLOB_READ_WRITE_TOKEN หรือ BLOB_STORE_ID) กรุณาเชื่อมต่อ Vercel Blob Storage ในหน้า Vercel Dashboard");
-  }
-}
-
 export async function saveParticipant(data) {
-  checkToken();
   const key = getBlobKey(data);
-  const result = await put(`${PREFIX}${key}.json`, JSON.stringify(data), {
-    access: "public",
-    addRandomSuffix: false,
-    allowOverwrite: true,
-    cacheControlMaxAge: 0,
-  });
-
-  // If data migrated from a legacy/different blob URL, delete the old file to prevent duplicates
-  if (data._blobUrl && data._blobUrl !== result.url) {
-    try {
-      await del(data._blobUrl).catch(e => console.warn("Failed to delete legacy blob:", e));
-    } catch (e) {}
+  const r = getRedis();
+  if (r) {
+    const record = { ...data, _blobUrl: key };
+    await r.hset(PARTICIPANTS_KEY, { [key]: JSON.stringify(record) });
+    if (data._blobUrl && data._blobUrl !== key) {
+      try {
+        await r.hdel(PARTICIPANTS_KEY, data._blobUrl);
+      } catch {}
+    }
+    return { url: key };
   }
 
-  return result;
+  // Fallback to Blob
+  try {
+    const { put, del } = await import("@vercel/blob");
+    const result = await put(`${PREFIX}${key}.json`, JSON.stringify(data), {
+      access: "public",
+      addRandomSuffix: false,
+      allowOverwrite: true,
+      cacheControlMaxAge: 0,
+    });
+    if (data._blobUrl && data._blobUrl !== result.url) {
+      del(data._blobUrl).catch(() => {});
+    }
+    return result;
+  } catch (err) {
+    throw err;
+  }
 }
 
 export async function readAllParticipants() {
-  checkToken();
-  const { blobs } = await list({ prefix: PREFIX });
-  if (!blobs || blobs.length === 0) return [];
-  
-  const rows = await Promise.all(blobs.map(async b => {
-    try {
-      const data = await fetch(`${b.url}?t=${Date.now()}`, {
-        cache: "no-store",
-        headers: { "Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache" }
-      }).then(r => r.json());
-      return { ...data, _blobUrl: b.url };
-    } catch (e) {
-      console.error(`Failed to fetch blob at ${b.url}:`, e);
-      return null;
-    }
-  }));
-  
-  // Purge any legacy mock user demo blobs
-  const mockBlobsToDelete = rows.filter(r => r !== null && isMockUser(r) && r._blobUrl).map(r => r._blobUrl);
-  if (mockBlobsToDelete.length > 0) {
-    del(mockBlobsToDelete).catch(err => console.warn("Failed to delete mock blobs:", err));
+  const r = getRedis();
+  if (r) {
+    const map = await r.hgetall(PARTICIPANTS_KEY);
+    if (!map) return [];
+    const rows = Object.entries(map).map(([k, v]) => {
+      try {
+        const data = typeof v === "string" ? JSON.parse(v) : v;
+        return { ...data, _blobUrl: data._blobUrl || k };
+      } catch {
+        return null;
+      }
+    }).filter(r => r !== null && r.name && !isMockUser(r));
+    return rows.sort((a, b) => (b.regTime || "").localeCompare(a.regTime || ""));
   }
 
-  const validRows = rows.filter(r => r !== null && r.name && !isMockUser(r));
-
-  // Deduplicate and merge participants by unique identity
-  const map = new Map();
-  const duplicateBlobUrlsToDelete = [];
-
-  for (const user of validRows) {
-    const cleanEmpId = (user.empId && user.empId !== "-") ? String(user.empId).trim().toUpperCase() : "";
-    const cleanName = normalizeName(user.name);
-    // Identity key: empId for employees, or normalized name for contractors
-    const identityKey = cleanEmpId ? `emp:${cleanEmpId}` : `contractor:${cleanName}`;
-
-    if (!map.has(identityKey)) {
-      map.set(identityKey, user);
-    } else {
-      // Duplicate found! Merge records into one canonical record
-      const existing = map.get(identityKey);
-      
-      const mergedWatched = Array.from(new Set([...(existing.watched || []), ...(user.watched || [])]));
-      const mergedWatchedAt = { ...(user.watchedAt || {}), ...(existing.watchedAt || {}) };
-      
-      const earlierRegTime = (existing.regTime && user.regTime)
-        ? (existing.regTime < user.regTime ? existing.regTime : user.regTime)
-        : (existing.regTime || user.regTime || "");
-
-      const canonicalKey = getBlobKey(existing);
-      const isUserCanonical = user._blobUrl && user._blobUrl.includes(`/${canonicalKey}.json`);
-      const isExistingCanonical = existing._blobUrl && existing._blobUrl.includes(`/${canonicalKey}.json`);
-
-      if (isUserCanonical && !isExistingCanonical) {
-        if (existing._blobUrl) duplicateBlobUrlsToDelete.push(existing._blobUrl);
-        existing._blobUrl = user._blobUrl;
-      } else {
-        if (user._blobUrl && user._blobUrl !== existing._blobUrl) {
-          duplicateBlobUrlsToDelete.push(user._blobUrl);
-        }
+  // Fallback to Blob
+  try {
+    const { list } = await import("@vercel/blob");
+    const { blobs } = await list({ prefix: PREFIX });
+    if (!blobs || blobs.length === 0) return [];
+    const rows = (await Promise.all(blobs.map(async b => {
+      try {
+        const data = await fetch(`${b.url}?t=${Date.now()}`).then(res => res.json());
+        return { ...data, _blobUrl: b.url };
+      } catch {
+        return null;
       }
-
-      existing.watched = mergedWatched;
-      existing.watchedAt = mergedWatchedAt;
-      existing.regTime = earlierRegTime;
-      if (!existing.dept || existing.dept === "อื่นๆ") {
-        existing.dept = user.dept || existing.dept;
-      }
-      if (cleanEmpId && (!existing.empId || existing.empId === "-")) {
-        existing.empId = cleanEmpId;
-      }
-    }
+    }))).filter(r => r !== null && r.name && !isMockUser(r));
+    return rows.sort((a, b) => (b.regTime || "").localeCompare(a.regTime || ""));
+  } catch {
+    return [];
   }
-
-  // Asynchronously clean up duplicate legacy blobs in the background
-  if (duplicateBlobUrlsToDelete.length > 0) {
-    try {
-      await del(duplicateBlobUrlsToDelete).catch(err => console.warn("Failed to delete duplicate blobs:", err));
-    } catch (e) {
-      console.warn("Error cleaning duplicate blobs:", e);
-    }
-  }
-
-  const result = Array.from(map.values());
-  return result.sort((a, b) => b.regTime.localeCompare(a.regTime));
 }
 
 export async function removeParticipant(url) {
-  checkToken();
-  await del(url);
+  const r = getRedis();
+  if (r) {
+    const key = url ? url.replace(/^.*[\\\/]/, "").replace(/\.json$/, "") : url;
+    await r.hdel(PARTICIPANTS_KEY, key);
+    return;
+  }
+  try {
+    const { del } = await import("@vercel/blob");
+    await del(url);
+  } catch {}
 }
 
 export async function clearAll() {
-  checkToken();
-  const { blobs } = await list({ prefix: PREFIX });
-  if (blobs && blobs.length > 0) {
-    await del(blobs.map(b => b.url));
+  const r = getRedis();
+  if (r) {
+    await r.del(PARTICIPANTS_KEY);
+    return;
+  }
+  try {
+    const { list, del } = await import("@vercel/blob");
+    const { blobs } = await list({ prefix: PREFIX });
+    if (blobs && blobs.length > 0) {
+      await del(blobs.map(b => b.url));
+    }
+  } catch {}
+}
+
+export async function saveVideos(videosList) {
+  const r = getRedis();
+  if (r) {
+    await r.set(VIDEOS_KEY, JSON.stringify(videosList));
+    return { ok: true };
+  }
+  try {
+    const { put } = await import("@vercel/blob");
+    return await put(VIDEOS_BLOB_PATH, JSON.stringify(videosList), {
+      access: "public",
+      addRandomSuffix: false,
+      allowOverwrite: true,
+    });
+  } catch (err) {
+    throw err;
   }
 }
 
-// --- Videos API Helpers ---
-const VIDEOS_BLOB_PATH = "epago/videos.json";
-
-export async function saveVideos(videosList) {
-  checkToken();
-  return await put(VIDEOS_BLOB_PATH, JSON.stringify(videosList), {
-    access: "public",
-    addRandomSuffix: false,
-    allowOverwrite: true,
-  });
-}
-
 export async function readVideos() {
-  checkToken();
+  const r = getRedis();
+  if (r) {
+    const data = await r.get(VIDEOS_KEY);
+    if (!data) return null;
+    return typeof data === "string" ? JSON.parse(data) : data;
+  }
   try {
+    const { list } = await import("@vercel/blob");
     const { blobs } = await list({ prefix: VIDEOS_BLOB_PATH });
     if (!blobs || blobs.length === 0) return null;
-    const b = blobs[0];
-    const data = await fetch(`${b.url}?t=${Date.now()}`).then(r => r.json());
-    return data;
-  } catch (e) {
-    console.error("Failed to read videos from blob:", e);
+    return await fetch(`${blobs[0].url}?t=${Date.now()}`).then(res => res.json());
+  } catch {
     return null;
   }
 }
 
-// --- Headcount Settings API Helpers ---
-const HEADCOUNT_BLOB_PATH = "epago/headcount.json";
-
 export async function saveHeadcount(headcountData) {
-  checkToken();
-  return await put(HEADCOUNT_BLOB_PATH, JSON.stringify(headcountData), {
-    access: "public",
-    addRandomSuffix: false,
-    allowOverwrite: true,
-  });
+  const r = getRedis();
+  if (r) {
+    await r.set(HEADCOUNT_KEY, JSON.stringify(headcountData));
+    return { ok: true };
+  }
+  try {
+    const { put } = await import("@vercel/blob");
+    return await put(HEADCOUNT_BLOB_PATH, JSON.stringify(headcountData), {
+      access: "public",
+      addRandomSuffix: false,
+      allowOverwrite: true,
+    });
+  } catch (err) {
+    throw err;
+  }
 }
 
 export async function readHeadcount() {
-  checkToken();
+  const r = getRedis();
+  if (r) {
+    const data = await r.get(HEADCOUNT_KEY);
+    if (!data) return null;
+    return typeof data === "string" ? JSON.parse(data) : data;
+  }
   try {
+    const { list } = await import("@vercel/blob");
     const { blobs } = await list({ prefix: HEADCOUNT_BLOB_PATH });
     if (!blobs || blobs.length === 0) return null;
-    const b = blobs[0];
-    const data = await fetch(`${b.url}?t=${Date.now()}`).then(r => r.json());
-    return data;
-  } catch (e) {
-    console.error("Failed to read headcount from blob:", e);
+    return await fetch(`${blobs[0].url}?t=${Date.now()}`).then(res => res.json());
+  } catch {
     return null;
   }
 }
