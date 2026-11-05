@@ -3961,8 +3961,8 @@ function generateSummaryPdfHtml(data, options = {}) {
                         <div style="font-size: 11px; font-weight: 700; color: #1b4c9e; letter-spacing: 0.5px; text-transform: uppercase;">
                             การไฟฟ้าฝ่ายผลิตแห่งประเทศไทย (กฟผ.) ไทรน้อย
                         </div>
-                        <div style="font-size: 15px; font-weight: 800; color: #0f2c59; line-height: 1.25; margin-top: 1px;">
-                            รายงานสรุปผลการเข้าร่วมกิจกรรมและประเมินการรับชมสื่ออนุรักษ์พลังงาน (สรุปภาพรวมรายฝ่าย)
+                        <div style="font-size: 14.5px; font-weight: 800; color: #0f2c59; line-height: 1.25; margin-top: 1px;">
+                            สรุปยอดผู้เข้าร่วมกิจกรรมดูคลิปส่งเสริมและปลูกจิตสำนึกการอนุรักษ์พลังงาน (สรุปภาพรวมรายฝ่าย)
                         </div>
                         <div style="font-size: 10px; color: #64748b; margin-top: 2px;">
                             EGAT Sainoi Smart Energy Video Hub
@@ -4044,8 +4044,8 @@ function generateSummaryPdfHtml(data, options = {}) {
                     <div style="font-size: 11px; font-weight: 700; color: #1b4c9e; letter-spacing: 0.5px; text-transform: uppercase;">
                         การไฟฟ้าฝ่ายผลิตแห่งประเทศไทย (กฟผ.) ไทรน้อย
                     </div>
-                    <div style="font-size: 15px; font-weight: 800; color: #0f2c59; line-height: 1.25; margin-top: 1px;">
-                        รายงานสรุปผลการเข้าร่วมกิจกรรมและประเมินการรับชมสื่ออนุรักษ์พลังงาน
+                    <div style="font-size: 14.5px; font-weight: 800; color: #0f2c59; line-height: 1.25; margin-top: 1px;">
+                        สรุปยอดผู้เข้าร่วมกิจกรรมดูคลิปส่งเสริมและปลูกจิตสำนึกการอนุรักษ์พลังงาน
                     </div>
                     <div style="font-size: 10px; color: #64748b; margin-top: 2px;">
                         EGAT Sainoi Smart Energy Video Hub
